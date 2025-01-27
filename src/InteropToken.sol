@@ -15,13 +15,15 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
         address token;
         uint256 amount;
         uint64 destinationChainId;
+        bytes32 intent;
     }
 
-    bytes32 immutable ORDER_DATA_TYPE_HASH = keccak256(TradeInfo);
+    bytes32 immutable ORDER_DATA_TYPE_HASH =
+        keccak256(
+            "TradeInfo(address from,address to,address token,uint256 amount,uint64 destinationChainId,bytes32 intent)"
+        );
 
-    address constant bridgeOnSourceChain = address(1);
-
-    event TransferredToBridgeOnSourceChain(
+    event TransferredToContractOnSourceChain(
         address indexed from,
         address indexed to,
         uint256 indexed amount
@@ -45,16 +47,33 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
         bytes32 intent
     ) external nonReentrant {
         require(amount > 0, "Amount must be greater than zero");
-        super._transfer(from, bridgeOnSourceChain, amount);
+        _transfer(from, address(this), amount);
 
-        emit TransferredToBridgeOnSourceChain(from, to, amount);
+        emit TransferredToContractOnSourceChain(from, address(this), amount);
+
+        open(
+            OnchainCrossChainOrder({
+                fillDeadline: 1769494252, // Example timestamp: 2026-01-27
+                orderDataType: ORDER_DATA_TYPE_HASH,
+                orderData: abi.encode(
+                    TradeInfo({
+                        from: from,
+                        to: to,
+                        token: address(this),
+                        amount: amount,
+                        destinationChainId: destinationChainId,
+                        intent: intent
+                    })
+                )
+            })
+        );
     }
 
     /// @notice Opens a cross-chain order
     /// @dev To be called by the user
     /// @dev This method must emit the Open event
     /// @param order The OnchainCrossChainOrder definition
-    function open(OnchainCrossChainOrder calldata order) external nonReentrant {
+    function open(OnchainCrossChainOrder calldata order) public nonReentrant {
         (
             ResolvedCrossChainOrder memory resolvedOrder,
             TradeInfo memory tradeInfo
@@ -64,15 +83,11 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
             pendingOrders[resolvedOrder.orderId].amount == 0,
             "Order already pending"
         );
+
         pendingOrders[resolvedOrder.orderId] = tradeInfo;
 
-        // TODO: Assets should only be releaseable to the filler
-        // on this chain once a proof of fill is submitted in a separate function. Ideally we can use RIP7755
-        // to implement the storage proof escrow system.
-        transferFrom(msg.sender, address(this), tradeInfo.amount);
+        _transfer(msg.sender, address(this), tradeInfo.amount);
 
-        // The OpenEvent contains originData which is required to make the destination chain fill, so we only
-        // emit the user calls.
         emit IOriginSettler.Open(
             keccak256(resolvedOrder.fillInstructions[0].originData),
             resolvedOrder
@@ -93,32 +108,50 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
             revert WrongOrderDataType();
         }
 
-        (tradeInfo) = decode7683OrderData(order.orderData);
+        tradeInfo = decode7683OrderData(order.orderData);
 
         resolvedOrder = ResolvedCrossChainOrder({
             user: msg.sender,
             originChainId: block.chainid,
-            openDeadline: type(uint32).max, // no deadline since user is msg.sender
+            openDeadline: type(uint32).max, // No deadline for origin orders
             fillDeadline: order.fillDeadline,
-            minReceived: new Output[](1){
-                token: _toBytes32(tradeInfo.token),
-                amount: tradeInfo.amount,
-                recipient: _toBytes32(tradeInfo.to),
-                chainId: block.chainid
-            },
-            maxSpent: new Output[](1){
-                token: _toBytes32(tradeInfo.token),
-                amount: tradeInfo.amount,
-                recipient: _toBytes32(tradeInfo.to),
-                chainId: tradeInfo.destinationChainId
-            },
-            fillInstructions: new FillInstruction[](1){
-                destinationChainId: tradeInfo.destinationChainId,
-                destinationSettler: _toBytes32(tradeInfo.to),
-                originData: "To be decided"
-            },
-            orderId: "Generate a UUID"
+            minReceived: new Output,
+            maxSpent: new Output,
+            fillInstructions: new FillInstruction,
+            orderId: _generateUUID() // Generate order ID as hash of order data
         });
+
+        resolvedOrder.minReceived[0] = Output({
+            token: _toBytes32(tradeInfo.token),
+            amount: tradeInfo.amount,
+            recipient: _toBytes32(tradeInfo.to),
+            chainId: block.chainid
+        });
+
+        resolvedOrder.maxSpent[0] = Output({
+            token: _toBytes32(tradeInfo.token),
+            amount: tradeInfo.amount,
+            recipient: _toBytes32(tradeInfo.to),
+            chainId: tradeInfo.destinationChainId
+        });
+
+        resolvedOrder.fillInstructions[0] = FillInstruction({
+            destinationChainId: tradeInfo.destinationChainId,
+            destinationSettler: _toBytes32(tradeInfo.to),
+            originData: "To be decided"
+        });
+    }
+
+    function _generateUUID() internal view returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    block.timestamp, // Current block timestamp
+                    block.difficulty, // Mining difficulty
+                    msg.sender, // Transaction sender
+                    blockhash(block.number - 1) // Previous block hash
+                )
+            );
     }
 
     function _toBytes32(address input) internal pure returns (bytes32) {
@@ -127,8 +160,7 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
 
     function decode7683OrderData(
         bytes memory orderData
-    ) public pure returns (TradeInfo) {
-        TradeInfo memory decodedOrderData = abi.decode(orderData, (TradeInfo));
-        return decodedOrderData;
+    ) public pure returns (TradeInfo memory) {
+        return abi.decode(orderData, (TradeInfo));
     }
 }
