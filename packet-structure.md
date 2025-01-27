@@ -43,6 +43,7 @@ struct ResolvedCrossChainOrder {
     ],
 	"fillInstructions": [
         // Each instruction in this array is parameterizes a single leg of the fill. This provides the filler with the information necessary to perform the fill on the destination(s).
+        // Array of FillInstruction struct declared below: FillInstruction[]
     ]
 }
 
