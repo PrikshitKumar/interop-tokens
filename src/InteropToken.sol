@@ -38,7 +38,6 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
         uint256 _initialSupply
     ) ERC20(_tokenName, _tokenSymbol) Ownable(_initialOwner) {
         _mint(_initialOwner, _initialSupply);
-        _transferOwnership(_initialOwner);
     }
 
     function transferTokensCrossChain(
@@ -47,11 +46,10 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
         uint256 amount,
         uint64 destinationChainId,
         bytes32 intent
-    ) external nonReentrant {
+    ) external payable nonReentrant {
         require(amount > 0, "Amount must be greater than zero");
-        _transfer(from, address(this), amount);
 
-        emit TransferredToContractOnSourceChain(from, address(this), amount);
+        // TODO: Add the mechanism to incentivize the relayer Operator
 
         open(
             OnchainCrossChainOrder({
@@ -112,35 +110,56 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
 
         tradeInfo = decode7683OrderData(order.orderData);
 
+        Output[] storage _maxSpent;
+        Output[] storage _minReceived;
+
+        _maxSpent.push(
+            Output({
+                token: _toBytes32(tradeInfo.token),
+                amount: tradeInfo.amount,
+                recipient: _toBytes32(tradeInfo.to),
+                chainId: tradeInfo.destinationChainId
+            })
+        );
+
+        _minReceived.push(
+            Output({
+                token: _toBytes32(tradeInfo.token),
+                amount: tradeInfo.amount, // This amount represents the minimum relayer fee compensated for facilitating the transaction to Filler
+                recipient: _toBytes32(address(0)),
+                chainId: block.chainid
+            })
+        );
+
         resolvedOrder = ResolvedCrossChainOrder({
             user: msg.sender,
             originChainId: block.chainid,
             openDeadline: type(uint32).max, // No deadline for origin orders
             fillDeadline: order.fillDeadline,
-            minReceived: new Output,
-            maxSpent: new Output,
-            fillInstructions: new FillInstruction,
-            orderId: _generateUUID() // Generate order ID as hash of order data
+            orderId: _generateUUID(), // Generate order ID as hash of order data
+            maxSpent: _maxSpent,
+            minReceived: _minReceived,
+            fillInstructions: FillInstruction
         });
 
-        resolvedOrder.minReceived[0] = Output({
-            token: _toBytes32(tradeInfo.token),
-            amount: tradeInfo.amount,
-            recipient: _toBytes32(tradeInfo.to),
-            chainId: block.chainid
-        });
+        // resolvedOrder.maxSpent.push(Output({
+        //     token: _toBytes32(tradeInfo.token),
+        //     amount: tradeInfo.amount,
+        //     recipient: _toBytes32(tradeInfo.to),
+        //     chainId: tradeInfo.destinationChainId
+        // }));
 
-        resolvedOrder.maxSpent[0] = Output({
-            token: _toBytes32(tradeInfo.token),
-            amount: tradeInfo.amount,
-            recipient: _toBytes32(tradeInfo.to),
-            chainId: tradeInfo.destinationChainId
-        });
+        // resolvedOrder.minReceived.push(Output({
+        //     token: _toBytes32(tradeInfo.token),
+        //     amount: tradeInfo.amount, // This amount represents the minimum relayer fee compensated for facilitating the transaction to Filler
+        //     recipient: _toBytes32(address(0)),
+        //     chainId: block.chainid
+        // }));
 
         resolvedOrder.fillInstructions[0] = FillInstruction({
             destinationChainId: tradeInfo.destinationChainId,
             destinationSettler: _toBytes32(tradeInfo.to),
-            originData: "To be decided"
+            originData: order.orderData
         });
     }
 
