@@ -4,3 +4,6 @@
 [submodule "lib/openzeppelin-contracts"]
 	path = lib/openzeppelin-contracts
 	url = https://github.com/Openzeppelin/openzeppelin-contracts
+[submodule "lib/eip-7702-erc-7683-demo"]
+	path = lib/eip-7702-erc-7683-demo
+	url = https://github.com/across-protocol/eip-7702-erc-7683-demo
