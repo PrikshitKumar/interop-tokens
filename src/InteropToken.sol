@@ -3,8 +3,8 @@ pragma solidity ^0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {IOriginSettler} from "./ERC7683.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {OnchainCrossChainOrder, ResolvedCrossChainOrder, IOriginSettler, Output, FillInstruction} from "./ERC7683.sol";
 
 contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
     mapping(bytes32 => TradeInfo) public pendingOrders;
@@ -29,12 +29,14 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
         uint256 indexed amount
     );
 
+    error WrongOrderDataType();
+
     constructor(
         address _initialOwner,
         string memory _tokenName,
         string memory _tokenSymbol,
         uint256 _initialSupply
-    ) ERC20(_tokenName, _tokenSymbol) {
+    ) ERC20(_tokenName, _tokenSymbol) Ownable(_initialOwner) {
         _mint(_initialOwner, _initialSupply);
         _transferOwnership(_initialOwner);
     }
@@ -43,7 +45,7 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
         address from,
         address to,
         uint256 amount,
-        uint256 destinationChainId,
+        uint64 destinationChainId,
         bytes32 intent
     ) external nonReentrant {
         require(amount > 0, "Amount must be greater than zero");

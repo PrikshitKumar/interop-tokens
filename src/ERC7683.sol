@@ -99,6 +99,16 @@ interface IOriginSettler {
     /// @param resolvedOrder resolved order that would be returned by resolve if called instead of Open
     event Open(bytes32 indexed orderId, ResolvedCrossChainOrder resolvedOrder);
 
+    /// @notice Opens a cross-chain order
+    /// @dev To be called by the user
+    /// @dev This method must emit the Open event
+    /// @param order The OnchainCrossChainOrder definition
+    function open(OnchainCrossChainOrder calldata order) external;
+
+    /*
+
+    Uncomment, if required
+
     /// @notice Opens a gasless cross-chain order on behalf of a user.
     /// @dev To be called by the filler.
     /// @dev This method must emit the Open event
@@ -110,12 +120,6 @@ interface IOriginSettler {
         bytes calldata signature,
         bytes calldata originFillerData
     ) external;
-
-    /// @notice Opens a cross-chain order
-    /// @dev To be called by the user
-    /// @dev This method must emit the Open event
-    /// @param order The OnchainCrossChainOrder definition
-    function open(OnchainCrossChainOrder calldata order) external;
 
     /// @notice Resolves a specific GaslessCrossChainOrder into a generic ResolvedCrossChainOrder
     /// @dev Intended to improve standardized integration of various order types and settlement contracts
@@ -134,6 +138,7 @@ interface IOriginSettler {
     function resolve(
         OnchainCrossChainOrder calldata order
     ) external view returns (ResolvedCrossChainOrder memory);
+    */
 }
 
 /// @title IDestinationSettler
