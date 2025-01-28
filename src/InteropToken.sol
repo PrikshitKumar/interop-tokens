@@ -4,9 +4,15 @@ pragma solidity ^0.8.13;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {OnchainCrossChainOrder, ResolvedCrossChainOrder, IOriginSettler, Output, FillInstruction} from "./ERC7683.sol";
+import {OnchainCrossChainOrder, ResolvedCrossChainOrder, Output, FillInstruction, IOriginSettler, IDestinationSettler} from "./ERC7683.sol";
 
-contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
+contract InteropToken is
+    ERC20,
+    Ownable,
+    ReentrancyGuard,
+    IOriginSettler,
+    IDestinationSettler
+{
     mapping(bytes32 => TradeInfo) public pendingOrders;
 
     struct TradeInfo {
@@ -50,6 +56,8 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
             TradeInfo memory tradeInfo
         ) = _resolve(order);
 
+        require(tradeInfo.amount != 0, "Invalid Order");
+
         require(
             pendingOrders[resolvedOrder.orderId].amount == 0,
             "Order already pending"
@@ -58,6 +66,7 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
         pendingOrders[resolvedOrder.orderId] = tradeInfo;
 
         _transfer(msg.sender, address(this), tradeInfo.amount);
+        // TODO: Transfer the RelayFee (Native Tokens) to Filler
 
         emit IOriginSettler.Open(
             keccak256(resolvedOrder.fillInstructions[0].originData),
@@ -117,6 +126,18 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
         });
     }
 
+    function fill(
+        bytes32 orderId,
+        bytes calldata originData,
+        bytes calldata fillerData
+    ) external nonReentrant {
+        TradeInfo memory tradeInfo = decode7683OrderData(originData);
+        _transfer(address(this), tradeInfo.to, tradeInfo.amount);
+
+        // TODO: To be Decided, what fillerData should contain
+        // decode7683FillInstruction(fillerData)
+    }
+
     function _generateUUID() internal view returns (bytes32) {
         return
             keccak256(
@@ -137,5 +158,11 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
         bytes memory orderData
     ) public pure returns (TradeInfo memory) {
         return abi.decode(orderData, (TradeInfo));
+    }
+
+    function decode7683FillInstruction(
+        bytes memory fillInstruction
+    ) public pure returns (FillInstruction memory) {
+        return abi.decode(fillInstruction, (FillInstruction));
     }
 }

@@ -101,6 +101,8 @@ contract InteropTokenTest is Test {
 
         // Stop recording logs
         Vm.Log[] memory logs = vm.getRecordedLogs();
+        FillInstruction[] memory fillInstructions;
+        bytes32 orderId;
 
         // Search for the emitted Open event
         for (uint256 i = 0; i < logs.length; i++) {
@@ -115,11 +117,24 @@ contract InteropTokenTest is Test {
                 console.log("Open Event Found");
 
                 // Decode the topics and data
-                bytes32 orderId = bytes32(logs[i].topics[1]);
+                orderId = bytes32(logs[i].topics[1]);
                 ResolvedCrossChainOrder memory resolvedOrder = abi.decode(
                     logs[i].data,
                     (ResolvedCrossChainOrder)
                 );
+
+                fillInstructions = resolvedOrder.fillInstructions;
+                for (uint256 j = 0; j < fillInstructions.length; j++) {
+                    console.log("fillInstruction at ", j, " is: ");
+                    console.log(
+                        "Destination ChainId: ",
+                        fillInstructions[j].destinationChainId
+                    );
+                    console.log("Destination Settler: ");
+                    console.logBytes32(fillInstructions[j].destinationSettler);
+                    console.log("originData: ");
+                    console.logBytes(fillInstructions[j].originData);
+                }
 
                 // Log the event details
                 console.log("Order ID from Event caught: ");
@@ -142,7 +157,7 @@ contract InteropTokenTest is Test {
         vm.stopPrank();
 
         console.log(
-            "Owner Balance: ",
+            "Bridge Balance: ",
             interopToken.balanceOf(address(interopToken))
         );
 
@@ -160,6 +175,31 @@ contract InteropTokenTest is Test {
             interopToken.balanceOf(owner),
             9900,
             "Owner's balance should decrease"
+        );
+
+        for (uint256 i = 0; i < fillInstructions.length; i++) {
+            interopToken.fill(orderId, fillInstructions[i].originData, bytes(""));
+        }
+
+        console.log(
+            "Bridge Balance: ",
+            interopToken.balanceOf(address(interopToken))
+        );
+
+        // Assert that the tokens were transferred to the contract
+        assertEq(
+            interopToken.balanceOf(address(interopToken)),
+            0,
+            "Contract Balance should decrease, as contract transferred the tokens to receipient on Chain2"
+        );
+
+        console.log("User2 Balance: ", interopToken.balanceOf(user2));
+
+        // Assert that owner's balance decreased
+        assertEq(
+            interopToken.balanceOf(user2),
+            100,
+            "User2's balance should increase"
         );
     }
 }
