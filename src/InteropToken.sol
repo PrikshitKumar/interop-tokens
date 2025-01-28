@@ -113,10 +113,9 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
 
         tradeInfo = decode7683OrderData(order.orderData);
 
-        // TODO: Using storage is not useful here, either use memory or Assembly way to assing the memory
-        Output[] memory _maxSpent;
-        Output[] memory _minReceived;
-        FillInstruction[] memory _fillInstructions;
+        Output[] memory _maxSpent = new Output[](1);
+        Output[] memory _minReceived = new Output[](1);
+        FillInstruction[] memory _fillInstructions = new FillInstruction[](1);
 
         _maxSpent[0] = Output({
             token: _toBytes32(tradeInfo.token),
