@@ -40,6 +40,8 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
         _mint(_initialOwner, _initialSupply);
     }
 
+    // The work added under this function must be done by Application
+    /*
     function transferTokensCrossChain(
         address from,
         address to,
@@ -68,12 +70,13 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
             })
         );
     }
+    */
 
     /// @notice Opens a cross-chain order
     /// @dev To be called by the user
     /// @dev This method must emit the Open event
     /// @param order The OnchainCrossChainOrder definition
-    function open(OnchainCrossChainOrder calldata order) public nonReentrant {
+    function open(OnchainCrossChainOrder calldata order) external nonReentrant {
         (
             ResolvedCrossChainOrder memory resolvedOrder,
             TradeInfo memory tradeInfo
@@ -110,26 +113,30 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
 
         tradeInfo = decode7683OrderData(order.orderData);
 
-        Output[] storage _maxSpent;
-        Output[] storage _minReceived;
+        // TODO: Using storage is not useful here, either use memory or Assembly way to assing the memory
+        Output[] memory _maxSpent;
+        Output[] memory _minReceived;
+        FillInstruction[] memory _fillInstructions;
 
-        _maxSpent.push(
-            Output({
-                token: _toBytes32(tradeInfo.token),
-                amount: tradeInfo.amount,
-                recipient: _toBytes32(tradeInfo.to),
-                chainId: tradeInfo.destinationChainId
-            })
-        );
+        _maxSpent[0] = Output({
+            token: _toBytes32(tradeInfo.token),
+            amount: tradeInfo.amount,
+            recipient: _toBytes32(tradeInfo.to),
+            chainId: tradeInfo.destinationChainId
+        });
 
-        _minReceived.push(
-            Output({
-                token: _toBytes32(tradeInfo.token),
-                amount: tradeInfo.amount, // This amount represents the minimum relayer fee compensated for facilitating the transaction to Filler
-                recipient: _toBytes32(address(0)),
-                chainId: block.chainid
-            })
-        );
+        _minReceived[0] = Output({
+            token: _toBytes32(tradeInfo.token),
+            amount: tradeInfo.amount, // This amount represents the minimum relayer fee compensated for facilitating the transaction to Filler
+            recipient: _toBytes32(address(0)),
+            chainId: block.chainid
+        });
+
+        _fillInstructions[0] = FillInstruction({
+            destinationChainId: tradeInfo.destinationChainId,
+            destinationSettler: _toBytes32(tradeInfo.to),
+            originData: order.orderData
+        });
 
         resolvedOrder = ResolvedCrossChainOrder({
             user: msg.sender,
@@ -139,27 +146,7 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
             orderId: _generateUUID(), // Generate order ID as hash of order data
             maxSpent: _maxSpent,
             minReceived: _minReceived,
-            fillInstructions: FillInstruction
-        });
-
-        // resolvedOrder.maxSpent.push(Output({
-        //     token: _toBytes32(tradeInfo.token),
-        //     amount: tradeInfo.amount,
-        //     recipient: _toBytes32(tradeInfo.to),
-        //     chainId: tradeInfo.destinationChainId
-        // }));
-
-        // resolvedOrder.minReceived.push(Output({
-        //     token: _toBytes32(tradeInfo.token),
-        //     amount: tradeInfo.amount, // This amount represents the minimum relayer fee compensated for facilitating the transaction to Filler
-        //     recipient: _toBytes32(address(0)),
-        //     chainId: block.chainid
-        // }));
-
-        resolvedOrder.fillInstructions[0] = FillInstruction({
-            destinationChainId: tradeInfo.destinationChainId,
-            destinationSettler: _toBytes32(tradeInfo.to),
-            originData: order.orderData
+            fillInstructions: _fillInstructions
         });
     }
 
@@ -168,7 +155,7 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
             keccak256(
                 abi.encodePacked(
                     block.timestamp, // Current block timestamp
-                    block.difficulty, // Mining difficulty
+                    block.prevrandao, // Randomness beacon value in PoS
                     msg.sender, // Transaction sender
                     blockhash(block.number - 1) // Previous block hash
                 )
