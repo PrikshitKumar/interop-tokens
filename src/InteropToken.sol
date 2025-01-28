@@ -40,38 +40,6 @@ contract InteropToken is ERC20, Ownable, ReentrancyGuard, IOriginSettler {
         _mint(_initialOwner, _initialSupply);
     }
 
-    // The work added under this function must be done by Application
-    /*
-    function transferTokensCrossChain(
-        address from,
-        address to,
-        uint256 amount,
-        uint64 destinationChainId,
-        bytes32 intent
-    ) external payable nonReentrant {
-        require(amount > 0, "Amount must be greater than zero");
-
-        // TODO: Add the mechanism to incentivize the relayer Operator
-
-        open(
-            OnchainCrossChainOrder({
-                fillDeadline: 1769494252, // Example timestamp: 2026-01-27
-                orderDataType: ORDER_DATA_TYPE_HASH,
-                orderData: abi.encode(
-                    TradeInfo({
-                        from: from,
-                        to: to,
-                        token: address(this),
-                        amount: amount,
-                        destinationChainId: destinationChainId,
-                        intent: intent
-                    })
-                )
-            })
-        );
-    }
-    */
-
     /// @notice Opens a cross-chain order
     /// @dev To be called by the user
     /// @dev This method must emit the Open event

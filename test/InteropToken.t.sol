@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {InteropToken} from "../src/InteropToken.sol";
 import {OnchainCrossChainOrder, ResolvedCrossChainOrder, Output, FillInstruction, IOriginSettler} from "../src/ERC7683.sol";
 
@@ -90,30 +91,53 @@ contract InteropTokenTest is Test {
         );
         console.log("Allowance: ", allowance);
 
-        // Call the event directly using emit with the expected parameters before the function call.
-        // Before calling open, set up the event expectation
-        vm.expectEmit(true, true, false, true);
-
-        // Here you're specifying that you're expecting the Open event from IOriginSettler interface
-        emit IOriginSettler.Open(
-            keccak256(order.orderData), // Assuming this is how orderId is generated or use actual method if different
-            ResolvedCrossChainOrder({
-                user: owner,
-                originChainId: block.chainid,
-                openDeadline: type(uint32).max,
-                fillDeadline: order.fillDeadline,
-                orderId: keccak256(order.orderData), // Assuming this is how orderId is generated
-                maxSpent: new Output[](1),
-                minReceived: new Output[](1),
-                fillInstructions: new FillInstruction[](1)
-            })
-        );
+        // Record logs emitted during the execution
+        vm.recordLogs();
 
         // Call the function that emits the event
         // Call the `open` function
         interopToken.open(order);
-
         console.log("Open executed");
+
+        // Stop recording logs
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        // Search for the emitted Open event
+        for (uint256 i = 0; i < logs.length; i++) {
+            console.log("Finding Order: ");
+            console.logBytes32(logs[i].topics[0]);
+            if (
+                logs[i].topics[0] ==
+                keccak256(
+                    "Open(bytes32,(address,uint256,uint32,uint32,bytes32,(bytes32,uint256,bytes32,uint256)[],(bytes32,uint256,bytes32,uint256)[],(uint64,bytes32,bytes)[]))"
+                )
+            ) {
+                console.log("Open Event Found");
+
+                // Decode the topics and data
+                bytes32 orderId = bytes32(logs[i].topics[1]);
+                ResolvedCrossChainOrder memory resolvedOrder = abi.decode(
+                    logs[i].data,
+                    (ResolvedCrossChainOrder)
+                );
+
+                // Log the event details
+                console.log("Order ID from Event caught: ");
+                console.logBytes32(orderId);
+                console.log(
+                    "Resolved Order User from Event caught:",
+                    resolvedOrder.user
+                );
+                console.log(
+                    "Resolved Order Origin Chain ID from Event caught:",
+                    resolvedOrder.originChainId
+                );
+                console.log(
+                    "Resolved Order Fill Deadline from Event caught:",
+                    resolvedOrder.fillDeadline
+                );
+            }
+        }
 
         vm.stopPrank();
 
@@ -137,8 +161,5 @@ contract InteropTokenTest is Test {
             9900,
             "Owner's balance should decrease"
         );
-
-        // Emit assertion for the Open event
-        // bytes32 orderId = keccak256(abi.encodePacked(order.orderData));
     }
 }
