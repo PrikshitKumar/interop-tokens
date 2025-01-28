@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
 import {InteropToken} from "../src/InteropToken.sol";
-import {OnchainCrossChainOrder} from "../src/ERC7683.sol";
+import {OnchainCrossChainOrder, ResolvedCrossChainOrder, Output, FillInstruction, IOriginSettler} from "../src/ERC7683.sol";
 
 contract InteropTokenTest is Test {
     InteropToken public interopToken;
@@ -77,7 +77,6 @@ contract InteropTokenTest is Test {
         console.log("destinationChainId: ", tradeInfo.destinationChainId);
         console.log("intent: ");
         console.logBytes32(tradeInfo.intent);
-        // console.log("Order Data: ", order.orderData);
 
         // User with whom the transaction is executed
         vm.startPrank(owner);
@@ -85,9 +84,32 @@ contract InteropTokenTest is Test {
         // Approve the contract to spend owner's tokens
         interopToken.approve(address(interopToken), 100);
 
-        uint256 allowance = interopToken.allowance(owner, address(interopToken));
+        uint256 allowance = interopToken.allowance(
+            owner,
+            address(interopToken)
+        );
         console.log("Allowance: ", allowance);
 
+        // Call the event directly using emit with the expected parameters before the function call.
+        // Before calling open, set up the event expectation
+        vm.expectEmit(true, true, false, true);
+
+        // Here you're specifying that you're expecting the Open event from IOriginSettler interface
+        emit IOriginSettler.Open(
+            keccak256(order.orderData), // Assuming this is how orderId is generated or use actual method if different
+            ResolvedCrossChainOrder({
+                user: owner,
+                originChainId: block.chainid,
+                openDeadline: type(uint32).max,
+                fillDeadline: order.fillDeadline,
+                orderId: keccak256(order.orderData), // Assuming this is how orderId is generated
+                maxSpent: new Output[](1),
+                minReceived: new Output[](1),
+                fillInstructions: new FillInstruction[](1)
+            })
+        );
+
+        // Call the function that emits the event
         // Call the `open` function
         interopToken.open(order);
 
@@ -95,7 +117,10 @@ contract InteropTokenTest is Test {
 
         vm.stopPrank();
 
-        console.log("Owner Balance: ", interopToken.balanceOf(address(interopToken)));
+        console.log(
+            "Owner Balance: ",
+            interopToken.balanceOf(address(interopToken))
+        );
 
         // Assert that the tokens were transferred to the contract
         assertEq(
@@ -115,7 +140,5 @@ contract InteropTokenTest is Test {
 
         // Emit assertion for the Open event
         // bytes32 orderId = keccak256(abi.encodePacked(order.orderData));
-        // vm.expectEmit(true, true, true, true);
-        // emit IOriginSettler.Open(orderId, abi.decode(order.orderData, (ResolvedCrossChainOrder)));
     }
 }
