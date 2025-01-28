@@ -15,7 +15,7 @@ contract InteropTokenTest is Test {
 
     bytes32 constant ORDER_DATA_TYPE_HASH =
         keccak256(
-            "TradeInfo(address from,address to,address token,uint256 amount,uint64 destinationChainId,bytes32 intent)"
+            "TradeInfo(address,uint256,uint64,bytes32)"
         );
 
     // Setup the Users
@@ -32,9 +32,6 @@ contract InteropTokenTest is Test {
 
         // Deploy the contract
         interopToken = new InteropToken(owner, "InteropToken", "IPT", 10000);
-
-        // Optionally, mint tokens to owner for testing
-        // interopToken._mint(owner, 1000);
     }
 
     // Test that owner can transfer tokens successfully
@@ -53,12 +50,9 @@ contract InteropTokenTest is Test {
             orderDataType: ORDER_DATA_TYPE_HASH,
             orderData: abi.encode(
                 InteropToken.TradeInfo({
-                    from: owner,
                     to: user2,
-                    token: address(interopToken),
                     amount: 100,
-                    destinationChainId: destinationChainId,
-                    intent: bytes32("ERC-20 tokens Transfer to User2")
+                    destinationChainId: destinationChainId
                 })
             )
         });
@@ -71,25 +65,12 @@ contract InteropTokenTest is Test {
         console.log("fillDeadline: ", order.fillDeadline);
         console.log("orderDataType: ");
         console.logBytes32(order.orderDataType);
-        console.log("from: ", tradeInfo.from);
         console.log("to: ", tradeInfo.to);
-        console.log("token: ", tradeInfo.token);
         console.log("amount: ", tradeInfo.amount);
         console.log("destinationChainId: ", tradeInfo.destinationChainId);
-        console.log("intent: ");
-        console.logBytes32(tradeInfo.intent);
 
         // User with whom the transaction is executed
         vm.startPrank(owner);
-
-        // Approve the contract to spend owner's tokens
-        interopToken.approve(address(interopToken), 100);
-
-        uint256 allowance = interopToken.allowance(
-            owner,
-            address(interopToken)
-        );
-        console.log("Allowance: ", allowance);
 
         // Record logs emitted during the execution
         vm.recordLogs();
@@ -184,13 +165,6 @@ contract InteropTokenTest is Test {
         console.log(
             "Bridge Balance: ",
             interopToken.balanceOf(address(interopToken))
-        );
-
-        // Assert that the tokens were transferred to the contract
-        assertEq(
-            interopToken.balanceOf(address(interopToken)),
-            0,
-            "Contract Balance should decrease, as contract transferred the tokens to receipient on Chain2"
         );
 
         console.log("User2 Balance: ", interopToken.balanceOf(user2));

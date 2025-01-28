@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -16,26 +16,19 @@ contract InteropToken is
     mapping(bytes32 => TradeInfo) public pendingOrders;
 
     struct TradeInfo {
-        address from;
         address to;
-        address token;
         uint256 amount;
         uint64 destinationChainId;
-        bytes32 intent;
     }
 
     bytes32 immutable ORDER_DATA_TYPE_HASH =
         keccak256(
-            "TradeInfo(address from,address to,address token,uint256 amount,uint64 destinationChainId,bytes32 intent)"
+            "TradeInfo(address,uint256,uint64,bytes32)"
         );
 
-    event TransferredToContractOnSourceChain(
-        address indexed from,
-        address indexed to,
-        uint256 indexed amount
-    );
-
     error WrongOrderDataType();
+    
+    event Fill(bytes32 indexed orderId);
 
     constructor(
         address _initialOwner,
@@ -65,6 +58,9 @@ contract InteropToken is
 
         pendingOrders[resolvedOrder.orderId] = tradeInfo;
 
+        // order amount is taken in custody of the contract
+        // to be released in the event of order cancellation due to filler failure
+        // to be burnt in the event of a successful cross-chain transfer 
         _transfer(msg.sender, address(this), tradeInfo.amount);
         // TODO: Transfer the RelayFee (Native Tokens) to Filler
 
@@ -95,22 +91,22 @@ contract InteropToken is
         FillInstruction[] memory _fillInstructions = new FillInstruction[](1);
 
         _maxSpent[0] = Output({
-            token: _toBytes32(tradeInfo.token),
+            token: _toBytes32(address(this)),
             amount: tradeInfo.amount,
             recipient: _toBytes32(tradeInfo.to),
             chainId: tradeInfo.destinationChainId
         });
 
         _minReceived[0] = Output({
-            token: _toBytes32(tradeInfo.token),
+            token: _toBytes32(address(this)),
             amount: tradeInfo.amount, // This amount represents the minimum relayer fee compensated for facilitating the transaction to Filler
-            recipient: _toBytes32(address(0)),
+            recipient: _toBytes32(address(0)), // TODO : Add filler address here from the implementation authority contract
             chainId: block.chainid
         });
 
         _fillInstructions[0] = FillInstruction({
             destinationChainId: tradeInfo.destinationChainId,
-            destinationSettler: _toBytes32(tradeInfo.to),
+            destinationSettler: _toBytes32(address(this)), // Token address is assumed to be matching on the destination chain 
             originData: order.orderData
         });
 
@@ -119,7 +115,7 @@ contract InteropToken is
             originChainId: block.chainid,
             openDeadline: type(uint32).max, // No deadline for origin orders
             fillDeadline: order.fillDeadline,
-            orderId: _generateUUID(), // Generate order ID as hash of order data
+            orderId: _generateOrderId(), // Generate order ID as hash of order data
             maxSpent: _maxSpent,
             minReceived: _minReceived,
             fillInstructions: _fillInstructions
@@ -131,14 +127,21 @@ contract InteropToken is
         bytes calldata originData,
         bytes calldata fillerData
     ) external nonReentrant {
+        // TODO: Validate the sender to be an authorized filler address on implementation authority
         TradeInfo memory tradeInfo = decode7683OrderData(originData);
-        _transfer(address(this), tradeInfo.to, tradeInfo.amount);
+        _mint(tradeInfo.to, tradeInfo.amount);
 
+        emit Fill(orderId);
         // TODO: To be Decided, what fillerData should contain
-        // decode7683FillInstruction(fillerData)
+        // decode7683FillInstruction(fillerData);
+        fillerData;
     }
 
-    function _generateUUID() internal view returns (bytes32) {
+    // TODO: Add a confirmOrder function; called by the filler
+
+    // TODO: Add a cancelOrder function; called by the filler 
+
+    function _generateOrderId() internal view returns (bytes32) {
         return
             keccak256(
                 abi.encodePacked(
