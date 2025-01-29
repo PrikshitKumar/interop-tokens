@@ -31,6 +31,12 @@ $ forge build
 $ forge test
 ```
 
+- To run the tests on externally running chains
+
+```shell
+$ forge test --fork-url "http://127.0.0.1:8545"
+```
+
 ### Format
 
 ```shell
