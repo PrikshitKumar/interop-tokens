@@ -145,7 +145,7 @@ contract InteropToken is
                     block.timestamp, // Current block timestamp
                     block.prevrandao, // Randomness beacon value in PoS
                     msg.sender, // Transaction sender
-                    blockhash(block.number - 1) // Previous block hash
+                    block.number // Current block Number
                 )
             );
     }
