@@ -105,6 +105,14 @@ interface IOriginSettler {
     /// @param order The OnchainCrossChainOrder definition
     function open(OnchainCrossChainOrder calldata order) external;
 
+    /// @notice Resolves a specific OnchainCrossChainOrder into a generic ResolvedCrossChainOrder
+    /// @dev Intended to improve standardized integration of various order types and settlement contracts
+    /// @param order The OnchainCrossChainOrder definition
+    /// @return ResolvedCrossChainOrder hydrated order data including the inputs and outputs of the order
+    function resolve(
+        OnchainCrossChainOrder calldata order
+    ) external view returns (ResolvedCrossChainOrder memory);
+
     /*
 
     Uncomment, if required
@@ -129,14 +137,6 @@ interface IOriginSettler {
     function resolveFor(
         GaslessCrossChainOrder calldata order,
         bytes calldata originFillerData
-    ) external view returns (ResolvedCrossChainOrder memory);
-
-    /// @notice Resolves a specific OnchainCrossChainOrder into a generic ResolvedCrossChainOrder
-    /// @dev Intended to improve standardized integration of various order types and settlement contracts
-    /// @param order The OnchainCrossChainOrder definition
-    /// @return ResolvedCrossChainOrder hydrated order data including the inputs and outputs of the order
-    function resolve(
-        OnchainCrossChainOrder calldata order
     ) external view returns (ResolvedCrossChainOrder memory);
     */
 }

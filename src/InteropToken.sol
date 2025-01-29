@@ -51,10 +51,8 @@ contract InteropToken is
     /// @dev This method must emit the Open event
     /// @param order The OnchainCrossChainOrder definition
     function open(OnchainCrossChainOrder calldata order) external nonReentrant {
-        (
-            ResolvedCrossChainOrder memory resolvedOrder,
-            TradeInfo memory tradeInfo
-        ) = _resolve(order);
+        TradeInfo memory tradeInfo = decode7683OrderData(order.orderData);
+        ResolvedCrossChainOrder memory resolvedOrder = this.resolve(order);
 
         require(tradeInfo.amount != 0, "Invalid Order");
 
@@ -74,21 +72,14 @@ contract InteropToken is
         );
     }
 
-    function _resolve(
+    function resolve(
         OnchainCrossChainOrder calldata order
-    )
-        internal
-        view
-        returns (
-            ResolvedCrossChainOrder memory resolvedOrder,
-            TradeInfo memory tradeInfo
-        )
-    {
+    ) external view returns (ResolvedCrossChainOrder memory) {
         if (order.orderDataType != ORDER_DATA_TYPE_HASH) {
             revert WrongOrderDataType();
         }
 
-        tradeInfo = decode7683OrderData(order.orderData);
+        TradeInfo memory tradeInfo = decode7683OrderData(order.orderData);
 
         Output[] memory _maxSpent = new Output[](1);
         Output[] memory _minReceived = new Output[](1);
@@ -114,16 +105,17 @@ contract InteropToken is
             originData: order.orderData
         });
 
-        resolvedOrder = ResolvedCrossChainOrder({
-            user: msg.sender,
-            originChainId: block.chainid,
-            openDeadline: type(uint32).max, // No deadline for origin orders
-            fillDeadline: order.fillDeadline,
-            orderId: _generateUUID(), // Generate order ID as hash of order data
-            maxSpent: _maxSpent,
-            minReceived: _minReceived,
-            fillInstructions: _fillInstructions
-        });
+        return
+            ResolvedCrossChainOrder({
+                user: msg.sender,
+                originChainId: block.chainid,
+                openDeadline: type(uint32).max, // No deadline for origin orders
+                fillDeadline: order.fillDeadline,
+                orderId: _generateUUID(), // Generate order ID as hash of order data
+                maxSpent: _maxSpent,
+                minReceived: _minReceived,
+                fillInstructions: _fillInstructions
+            });
     }
 
     function fill(
