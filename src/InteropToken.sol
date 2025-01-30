@@ -13,20 +13,22 @@ contract InteropToken is
     IOriginSettler,
     IDestinationSettler
 {
-    mapping(bytes32 => TradeInfo) public pendingOrders;
+    mapping(bytes32 => OrderData) public pendingOrders;
 
-    struct TradeInfo {
+    struct OrderData {
         address to;
         uint256 amount;
         uint64 destinationChainId;
+        address feeToken;
+        uint256 feeValue;
     }
-
+    
     bytes32 immutable ORDER_DATA_TYPE_HASH =
         keccak256(
-            "TradeInfo(address,uint256,uint64,bytes32)"
+            "Order(address,uint256,uint64,address,uint256)"
         );
 
-    error WrongOrderDataType();
+    error WrongOrderType();
     
     event Fill(bytes32 indexed orderId);
 
@@ -46,22 +48,22 @@ contract InteropToken is
     function open(OnchainCrossChainOrder calldata order) external nonReentrant {
         (
             ResolvedCrossChainOrder memory resolvedOrder,
-            TradeInfo memory tradeInfo
+            OrderData memory orderData
         ) = _resolve(order);
 
-        require(tradeInfo.amount != 0, "Invalid Order");
+        require(orderData.amount != 0, "Invalid Order");
 
         require(
             pendingOrders[resolvedOrder.orderId].amount == 0,
             "Order already pending"
         );
 
-        pendingOrders[resolvedOrder.orderId] = tradeInfo;
+        pendingOrders[resolvedOrder.orderId] = orderData;
 
         // order amount is taken in custody of the contract
         // to be released in the event of order cancellation due to filler failure
         // to be burnt in the event of a successful cross-chain transfer 
-        _transfer(msg.sender, address(this), tradeInfo.amount);
+        _transfer(msg.sender, address(this), orderData.amount);
         // TODO: Transfer the RelayFee (Native Tokens) to Filler
 
         emit IOriginSettler.Open(
@@ -77,35 +79,35 @@ contract InteropToken is
         view
         returns (
             ResolvedCrossChainOrder memory resolvedOrder,
-            TradeInfo memory tradeInfo
+            OrderData memory orderData
         )
     {
         if (order.orderDataType != ORDER_DATA_TYPE_HASH) {
-            revert WrongOrderDataType();
+            revert WrongOrderType();
         }
 
-        tradeInfo = decode7683OrderData(order.orderData);
+        orderData = decode7683OrderData(order.orderData);
 
         Output[] memory _maxSpent = new Output[](1);
         Output[] memory _minReceived = new Output[](1);
         FillInstruction[] memory _fillInstructions = new FillInstruction[](1);
 
         _maxSpent[0] = Output({
-            token: _toBytes32(address(this)),
-            amount: tradeInfo.amount,
-            recipient: _toBytes32(tradeInfo.to),
-            chainId: tradeInfo.destinationChainId
+            token: _toBytes32(orderData.feeToken),
+            amount: orderData.feeValue,
+            recipient: _toBytes32(orderData.to),
+            chainId: orderData.destinationChainId
         });
 
         _minReceived[0] = Output({
             token: _toBytes32(address(this)),
-            amount: tradeInfo.amount, // This amount represents the minimum relayer fee compensated for facilitating the transaction to Filler
+            amount: orderData.amount, // This amount represents the minimum relayer fee compensated for facilitating the transaction to Filler
             recipient: _toBytes32(address(0)), // TODO : Add filler address here from the implementation authority contract
             chainId: block.chainid
         });
 
         _fillInstructions[0] = FillInstruction({
-            destinationChainId: tradeInfo.destinationChainId,
+            destinationChainId: orderData.destinationChainId,
             destinationSettler: _toBytes32(address(this)), // Token address is assumed to be matching on the destination chain 
             originData: order.orderData
         });
@@ -128,8 +130,8 @@ contract InteropToken is
         bytes calldata fillerData
     ) external nonReentrant {
         // TODO: Validate the sender to be an authorized filler address on implementation authority
-        TradeInfo memory tradeInfo = decode7683OrderData(originData);
-        _mint(tradeInfo.to, tradeInfo.amount);
+        OrderData memory orderData = decode7683OrderData(originData);
+        _mint(orderData.to, orderData.amount);
 
         emit Fill(orderId);
         // TODO: To be Decided, what fillerData should contain
@@ -159,8 +161,8 @@ contract InteropToken is
 
     function decode7683OrderData(
         bytes memory orderData
-    ) public pure returns (TradeInfo memory) {
-        return abi.decode(orderData, (TradeInfo));
+    ) public pure returns (OrderData memory) {
+        return abi.decode(orderData, (OrderData));
     }
 
     function decode7683FillInstruction(

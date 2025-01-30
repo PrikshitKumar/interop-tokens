@@ -15,7 +15,7 @@ contract InteropTokenTest is Test {
 
     bytes32 constant ORDER_DATA_TYPE_HASH =
         keccak256(
-            "TradeInfo(address,uint256,uint64,bytes32)"
+            "Order(address,uint256,uint64,address,uint256)"
         );
 
     // Setup the Users
@@ -49,25 +49,27 @@ contract InteropTokenTest is Test {
             fillDeadline: 1769494252, // Example timestamp: 2026-01-27
             orderDataType: ORDER_DATA_TYPE_HASH,
             orderData: abi.encode(
-                InteropToken.TradeInfo({
+                InteropToken.OrderData({
                     to: user2,
                     amount: 100,
-                    destinationChainId: destinationChainId
+                    destinationChainId: destinationChainId,
+                    feeToken: address(0),
+                    feeValue: 0
                 })
             )
         });
 
         // Log each part of the order
-        InteropToken.TradeInfo memory tradeInfo = abi.decode(
+        InteropToken.OrderData memory orderData = abi.decode(
             order.orderData,
-            (InteropToken.TradeInfo)
+            (InteropToken.OrderData)
         );
         console.log("fillDeadline: ", order.fillDeadline);
-        console.log("orderDataType: ");
+        console.log("OrderType: ");
         console.logBytes32(order.orderDataType);
-        console.log("to: ", tradeInfo.to);
-        console.log("amount: ", tradeInfo.amount);
-        console.log("destinationChainId: ", tradeInfo.destinationChainId);
+        console.log("to: ", orderData.to);
+        console.log("amount: ", orderData.amount);
+        console.log("destinationChainId: ", orderData.destinationChainId);
 
         // User with whom the transaction is executed
         vm.startPrank(owner);

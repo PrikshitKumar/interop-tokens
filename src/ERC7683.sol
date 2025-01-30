@@ -106,7 +106,6 @@ interface IOriginSettler {
     function open(OnchainCrossChainOrder calldata order) external;
 
     /*
-
     Uncomment, if required
 
     /// @notice Opens a gasless cross-chain order on behalf of a user.
