@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
 /// @title GaslessCrossChainOrder CrossChainOrder type
 /// @notice Standard order struct to be signed by users, disseminated to fillers, and submitted to origin settler contracts
@@ -114,7 +114,6 @@ interface IOriginSettler {
     ) external view returns (ResolvedCrossChainOrder memory);
 
     /*
-
     Uncomment, if required
 
     /// @notice Opens a gasless cross-chain order on behalf of a user.
