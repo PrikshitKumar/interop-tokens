@@ -46,10 +46,9 @@ contract InteropToken is
     /// @dev This method must emit the Open event
     /// @param order The OnchainCrossChainOrder definition
     function open(OnchainCrossChainOrder calldata order) external nonReentrant {
-        (
-            ResolvedCrossChainOrder memory resolvedOrder,
-            OrderData memory orderData
-        ) = _resolve(order);
+
+        OrderData memory orderData = decode7683OrderData(order.orderData);
+        ResolvedCrossChainOrder memory resolvedOrder = this.resolve(order);
 
         require(orderData.amount != 0, "Invalid Order");
 
@@ -72,21 +71,14 @@ contract InteropToken is
         );
     }
 
-    function _resolve(
+    function resolve(
         OnchainCrossChainOrder calldata order
-    )
-        internal
-        view
-        returns (
-            ResolvedCrossChainOrder memory resolvedOrder,
-            OrderData memory orderData
-        )
-    {
+    ) external view returns (ResolvedCrossChainOrder memory) {
         if (order.orderDataType != ORDER_DATA_TYPE_HASH) {
             revert WrongOrderType();
         }
 
-        orderData = decode7683OrderData(order.orderData);
+        OrderData memory orderData = decode7683OrderData(order.orderData);
 
         Output[] memory _maxSpent = new Output[](1);
         Output[] memory _minReceived = new Output[](1);
@@ -112,7 +104,7 @@ contract InteropToken is
             originData: order.orderData
         });
 
-        resolvedOrder = ResolvedCrossChainOrder({
+        return ResolvedCrossChainOrder({
             user: msg.sender,
             originChainId: block.chainid,
             openDeadline: type(uint32).max, // No deadline for origin orders
@@ -150,7 +142,7 @@ contract InteropToken is
                     block.timestamp, // Current block timestamp
                     block.prevrandao, // Randomness beacon value in PoS
                     msg.sender, // Transaction sender
-                    blockhash(block.number - 1) // Previous block hash
+                    block.number // Current block Number
                 )
             );
     }
