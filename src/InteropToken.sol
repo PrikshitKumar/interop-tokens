@@ -13,8 +13,6 @@ contract InteropToken is
     IOriginSettler,
     IDestinationSettler
 {
-    mapping(bytes32 => OrderData) public pendingOrders;
-
     struct OrderData {
         address to;
         uint256 amount;
@@ -22,15 +20,44 @@ contract InteropToken is
         address feeToken;
         uint256 feeValue;
     }
-    
+
+    struct OpenOrder {
+        address from;
+        OrderData orderData;
+    }
+
+    /**
+     * @notice The address of the Filler
+     * @dev Responsible to execute the orders
+     */
+    address private FILLER =
+        address(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496);
+
+    /**
+     * @notice Restricts access to only the authorized filler.
+     * @dev This modifier ensures that only the designated filler can execute the function it is applied to.
+     *
+     * Error:
+     * - `UnauthorizedFiller`: Reverted if the caller is not the authorized filler.
+     */
+    modifier onlyFiller() {
+        if (msg.sender != FILLER) revert UnauthorizedFiller(msg.sender, FILLER);
+        _;
+    }
+
+    mapping(bytes32 => OpenOrder) public pendingOrders;
+    mapping(bytes32 => bool) public executedOrders;
+
     bytes32 immutable ORDER_DATA_TYPE_HASH =
-        keccak256(
-            "Order(address,uint256,uint64,address,uint256)"
-        );
+        keccak256("Order(address,uint256,uint64,address,uint256)");
 
     error WrongOrderType();
-    
+    error OrderNotPending();
+    error UnauthorizedFiller(address sender, address filler);
+
     event Fill(bytes32 indexed orderId);
+    event Acknowledge(bytes32 indexed orderId);
+    event Cancel(bytes32 indexed orderId);
 
     constructor(
         address _initialOwner,
@@ -46,22 +73,24 @@ contract InteropToken is
     /// @dev This method must emit the Open event
     /// @param order The OnchainCrossChainOrder definition
     function open(OnchainCrossChainOrder calldata order) external nonReentrant {
-
         OrderData memory orderData = decode7683OrderData(order.orderData);
         ResolvedCrossChainOrder memory resolvedOrder = this.resolve(order);
 
         require(orderData.amount != 0, "Invalid Order");
-
         require(
-            pendingOrders[resolvedOrder.orderId].amount == 0,
+            pendingOrders[resolvedOrder.orderId].orderData.amount == 0,
             "Order already pending"
         );
+        OpenOrder memory openOrder = OpenOrder({
+            from: msg.sender,
+            orderData: orderData
+        });
 
-        pendingOrders[resolvedOrder.orderId] = orderData;
+        pendingOrders[resolvedOrder.orderId] = openOrder;
 
         // order amount is taken in custody of the contract
         // to be released in the event of order cancellation due to filler failure
-        // to be burnt in the event of a successful cross-chain transfer 
+        // to be burnt in the event of a successful cross-chain transfer
         _transfer(msg.sender, address(this), orderData.amount);
         // TODO: Transfer the RelayFee (Native Tokens) to Filler
 
@@ -100,32 +129,41 @@ contract InteropToken is
 
         _fillInstructions[0] = FillInstruction({
             destinationChainId: orderData.destinationChainId,
-            destinationSettler: _toBytes32(address(this)), // Token address is assumed to be matching on the destination chain 
+            destinationSettler: _toBytes32(address(this)), // Token address is assumed to be matching on the destination chain
             originData: order.orderData
         });
 
-        return ResolvedCrossChainOrder({
-            user: msg.sender,
-            originChainId: block.chainid,
-            openDeadline: type(uint32).max, // No deadline for origin orders
-            fillDeadline: order.fillDeadline,
-            orderId: _generateOrderId(), // Generate order ID as hash of order data
-            maxSpent: _maxSpent,
-            minReceived: _minReceived,
-            fillInstructions: _fillInstructions
-        });
+        return
+            ResolvedCrossChainOrder({
+                user: msg.sender,
+                originChainId: block.chainid,
+                openDeadline: type(uint32).max, // No deadline for origin orders
+                fillDeadline: order.fillDeadline,
+                orderId: _generateOrderId(), // Generate order ID as hash of order data
+                maxSpent: _maxSpent,
+                minReceived: _minReceived,
+                fillInstructions: _fillInstructions
+            });
     }
 
     function fill(
         bytes32 orderId,
         bytes calldata originData,
         bytes calldata fillerData
-    ) external nonReentrant {
+    ) external nonReentrant onlyFiller {
+        if (
+            executedOrders[orderId] ||
+            pendingOrders[orderId].orderData.amount == 0
+        ) {
+            revert OrderNotPending();
+        }
+
         // TODO: Validate the sender to be an authorized filler address on implementation authority
         OrderData memory orderData = decode7683OrderData(originData);
         _mint(orderData.to, orderData.amount);
 
         emit Fill(orderId);
+
         // TODO: To be Decided, what fillerData should contain
         // decode7683FillInstruction(fillerData);
         fillerData;
@@ -133,7 +171,16 @@ contract InteropToken is
 
     // TODO: Add a confirmOrder function; called by the filler
 
-    // TODO: Add a cancelOrder function; called by the filler 
+    function cancel(bytes32 orderId) external nonReentrant onlyFiller {
+        require(
+            pendingOrders[orderId].orderData.amount != 0,
+            "Order not found"
+        );
+        OpenOrder memory openOrder = pendingOrders[orderId];
+        _transfer(address(this), openOrder.from, openOrder.orderData.amount);
+        delete pendingOrders[orderId];
+        emit Cancel(orderId);
+    }
 
     function _generateOrderId() internal view returns (bytes32) {
         return

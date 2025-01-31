@@ -14,9 +14,7 @@ contract InteropTokenTest is Test {
     address public user2;
 
     bytes32 constant ORDER_DATA_TYPE_HASH =
-        keccak256(
-            "Order(address,uint256,uint64,address,uint256)"
-        );
+        keccak256("Order(address,uint256,uint64,address,uint256)");
 
     // Setup the Users
     function setUp() public {
@@ -100,11 +98,12 @@ contract InteropTokenTest is Test {
                 console.log("Open Event Found");
 
                 // Decode the topics and data
-                orderId = bytes32(logs[i].topics[1]);
                 ResolvedCrossChainOrder memory resolvedOrder = abi.decode(
                     logs[i].data,
                     (ResolvedCrossChainOrder)
                 );
+
+                orderId = resolvedOrder.orderId;
 
                 fillInstructions = resolvedOrder.fillInstructions;
                 for (uint256 j = 0; j < fillInstructions.length; j++) {
@@ -161,7 +160,11 @@ contract InteropTokenTest is Test {
         );
 
         for (uint256 i = 0; i < fillInstructions.length; i++) {
-            interopToken.fill(orderId, fillInstructions[i].originData, bytes(""));
+            interopToken.fill(
+                orderId,
+                fillInstructions[i].originData,
+                bytes("")
+            );
         }
 
         console.log(
