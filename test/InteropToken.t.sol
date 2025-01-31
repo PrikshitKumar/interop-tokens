@@ -180,5 +180,13 @@ contract InteropTokenTest is Test {
             100,
             "User2's balance should increase"
         );
+
+        interopToken.confirm(orderId);
+        (
+            address from,
+            InteropToken.OrderData memory pendingOrderData
+        ) = interopToken.pendingOrders(orderId);
+        console.log("Pending Order: ", from);
+        assertEq(from, address(0), "Order must be removed from pending orders");
     }
 }

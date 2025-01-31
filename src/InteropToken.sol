@@ -46,17 +46,16 @@ contract InteropToken is
     }
 
     mapping(bytes32 => OpenOrder) public pendingOrders;
-    mapping(bytes32 => bool) public executedOrders;
 
     bytes32 immutable ORDER_DATA_TYPE_HASH =
         keccak256("Order(address,uint256,uint64,address,uint256)");
 
     error WrongOrderType();
-    error OrderNotPending();
+    error OrderNotPending(bytes32 orderId);
     error UnauthorizedFiller(address sender, address filler);
 
     event Fill(bytes32 indexed orderId);
-    event Acknowledge(bytes32 indexed orderId);
+    event Confirm(bytes32 indexed orderId);
     event Cancel(bytes32 indexed orderId);
 
     constructor(
@@ -76,9 +75,8 @@ contract InteropToken is
         OrderData memory orderData = decode7683OrderData(order.orderData);
         ResolvedCrossChainOrder memory resolvedOrder = this.resolve(order);
 
-        require(orderData.amount != 0, "Invalid Order");
         require(
-            pendingOrders[resolvedOrder.orderId].orderData.amount == 0,
+            pendingOrders[resolvedOrder.orderId].from == address(0),
             "Order already pending"
         );
         OpenOrder memory openOrder = OpenOrder({
@@ -151,11 +149,8 @@ contract InteropToken is
         bytes calldata originData,
         bytes calldata fillerData
     ) external nonReentrant onlyFiller {
-        if (
-            executedOrders[orderId] ||
-            pendingOrders[orderId].orderData.amount == 0
-        ) {
-            revert OrderNotPending();
+        if (pendingOrders[orderId].from == address(0)) {
+            revert OrderNotPending(orderId);
         }
 
         // TODO: Validate the sender to be an authorized filler address on implementation authority
@@ -169,7 +164,11 @@ contract InteropToken is
         fillerData;
     }
 
-    // TODO: Add a confirmOrder function; called by the filler
+    function confirm(bytes32 orderId) external nonReentrant onlyFiller {
+        require(pendingOrders[orderId].from != address(0), "Order not found");
+        delete pendingOrders[orderId];
+        emit Confirm(orderId);
+    }
 
     function cancel(bytes32 orderId) external nonReentrant onlyFiller {
         require(
