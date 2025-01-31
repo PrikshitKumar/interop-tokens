@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {InteropTokenFactory} from "src/InteropTokenFactory.sol";
 import {InteropToken} from "src/InteropToken.sol";
 
@@ -41,7 +41,7 @@ contract InteropTokenFactoryTest is Test {
         assertEq(token.balanceOf(initialOwner), initialSupply);
     }
 
-    function testFailDeployWithSameSalt() public {
+    function testDeploymentWithSameSalt() public {
         // First deployment succeeds
         factory.deployInteropTokenFromFactory(
             initialOwner,
@@ -52,8 +52,7 @@ contract InteropTokenFactoryTest is Test {
         );
 
         // Expect the next deployment to fail before calling the function
-        // The CreateCollision error is typically thrown when there is an address collision in the EVM. In your case, this means that the contract address for the newly deployed InteropToken already exists, which can happen if the same salt is used in a CREATE2 operation.
-        vm.expectRevert("CreateCollision");
+        vm.expectRevert(InteropTokenFactory.InteropTokenCreate2Failed.selector);
 
         // This should revert and trigger `InteropTokenCreate2Failed`
         factory.deployInteropTokenFromFactory(

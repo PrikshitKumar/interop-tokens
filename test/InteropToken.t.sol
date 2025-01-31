@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {InteropToken} from "../src/InteropToken.sol";
 import {OnchainCrossChainOrder, ResolvedCrossChainOrder, Output, FillInstruction, IOriginSettler} from "../src/ERC7683.sol";
@@ -23,11 +23,6 @@ contract InteropTokenTest is Test {
         user1 = vm.addr(1); // Fetch address 1 (used as a test account)
         user2 = vm.addr(2); // Fetch address 2 (another test account)
 
-        // Log the addresses to console
-        console.log("Owner Address: ", owner);
-        console.log("User1 Address: ", user1);
-        console.log("User2 Address: ", user2);
-
         // Deploy the contract
         interopToken = new InteropToken(owner, "InteropToken", "IPT", 10000);
     }
@@ -35,7 +30,6 @@ contract InteropTokenTest is Test {
     // Test that owner can transfer tokens successfully
     function testOpenOrder() public {
         // Assert that user2's balance increased by the transfer amount
-        console.log("Owner Balance: ", interopToken.balanceOf(owner));
         assertEq(
             interopToken.balanceOf(owner),
             10000,
@@ -57,18 +51,6 @@ contract InteropTokenTest is Test {
             )
         });
 
-        // Log each part of the order
-        InteropToken.OrderData memory orderData = abi.decode(
-            order.orderData,
-            (InteropToken.OrderData)
-        );
-        console.log("fillDeadline: ", order.fillDeadline);
-        console.log("OrderType: ");
-        console.logBytes32(order.orderDataType);
-        console.log("to: ", orderData.to);
-        console.log("amount: ", orderData.amount);
-        console.log("destinationChainId: ", orderData.destinationChainId);
-
         // User with whom the transaction is executed
         vm.startPrank(owner);
 
@@ -78,7 +60,6 @@ contract InteropTokenTest is Test {
         // Call the function that emits the event
         // Call the `open` function
         interopToken.open(order);
-        console.log("Open executed");
 
         // Stop recording logs
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -87,16 +68,12 @@ contract InteropTokenTest is Test {
 
         // Search for the emitted Open event
         for (uint256 i = 0; i < logs.length; i++) {
-            console.log("Finding Order: ");
-            console.logBytes32(logs[i].topics[0]);
             if (
                 logs[i].topics[0] ==
                 keccak256(
                     "Open(bytes32,(address,uint256,uint32,uint32,bytes32,(bytes32,uint256,bytes32,uint256)[],(bytes32,uint256,bytes32,uint256)[],(uint64,bytes32,bytes)[]))"
                 )
             ) {
-                console.log("Open Event Found");
-
                 // Decode the topics and data
                 ResolvedCrossChainOrder memory resolvedOrder = abi.decode(
                     logs[i].data,
@@ -106,42 +83,10 @@ contract InteropTokenTest is Test {
                 orderId = resolvedOrder.orderId;
 
                 fillInstructions = resolvedOrder.fillInstructions;
-                for (uint256 j = 0; j < fillInstructions.length; j++) {
-                    console.log("fillInstruction at ", j, " is: ");
-                    console.log(
-                        "Destination ChainId: ",
-                        fillInstructions[j].destinationChainId
-                    );
-                    console.log("Destination Settler: ");
-                    console.logBytes32(fillInstructions[j].destinationSettler);
-                    console.log("originData: ");
-                    console.logBytes(fillInstructions[j].originData);
-                }
-
-                // Log the event details
-                console.log("Order ID from Event caught: ");
-                console.logBytes32(orderId);
-                console.log(
-                    "Resolved Order User from Event caught:",
-                    resolvedOrder.user
-                );
-                console.log(
-                    "Resolved Order Origin Chain ID from Event caught:",
-                    resolvedOrder.originChainId
-                );
-                console.log(
-                    "Resolved Order Fill Deadline from Event caught:",
-                    resolvedOrder.fillDeadline
-                );
             }
         }
 
         vm.stopPrank();
-
-        console.log(
-            "Bridge Balance: ",
-            interopToken.balanceOf(address(interopToken))
-        );
 
         // Assert that the tokens were transferred to the contract
         assertEq(
@@ -149,8 +94,6 @@ contract InteropTokenTest is Test {
             100,
             "Contract should hold the transferred tokens"
         );
-
-        console.log("Owner Balance: ", interopToken.balanceOf(owner));
 
         // Assert that owner's balance decreased
         assertEq(
@@ -167,13 +110,6 @@ contract InteropTokenTest is Test {
             );
         }
 
-        console.log(
-            "Bridge Balance: ",
-            interopToken.balanceOf(address(interopToken))
-        );
-
-        console.log("User2 Balance: ", interopToken.balanceOf(user2));
-
         // Assert that owner's balance decreased
         assertEq(
             interopToken.balanceOf(user2),
@@ -182,11 +118,7 @@ contract InteropTokenTest is Test {
         );
 
         interopToken.confirm(orderId);
-        (
-            address from,
-            InteropToken.OrderData memory pendingOrderData
-        ) = interopToken.pendingOrders(orderId);
-        console.log("Pending Order: ", from);
+        (address from, ) = interopToken.pendingOrders(orderId);
         assertEq(from, address(0), "Order must be removed from pending orders");
     }
 }
