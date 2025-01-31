@@ -3,8 +3,10 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {IOriginSettler, IDestinationSettler} from "./IERC7683.sol";
+
 /// @dev interface
-interface IToken is IERC20 {
+interface IInteropToken is IERC20, IOriginSettler ,IDestinationSettler {
 
     /// events
 

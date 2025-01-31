@@ -6,21 +6,16 @@ import {IImplementationAuthority} from "../interface/IImplementationAuthority.so
 import {AbstractProxy} from "./AbstractProxy.sol";
 
 contract TokenProxy is AbstractProxy {
+
     constructor(
         address implementationAuthority,
-        address _identityRegistry,
-        address _compliance,
         string memory _name,
         string memory _symbol,
         uint8 _decimals,
-        // _onchainID can be 0 address if the token has no ONCHAINID, ONCHAINID can be set later by the token Owner
-        address _onchainID
+        uint256 _initialSupply
     ) {
         require(
-            implementationAuthority != address(0)
-            && _identityRegistry != address(0)
-            && _compliance != address(0)
-        , "invalid argument - zero address");
+            implementationAuthority != address(0), "invalid argument - zero address");
         require(
             keccak256(abi.encode(_name)) != keccak256(abi.encode(""))
             && keccak256(abi.encode(_symbol)) != keccak256(abi.encode(""))
@@ -34,13 +29,11 @@ contract TokenProxy is AbstractProxy {
         // solhint-disable-next-line avoid-low-level-calls
         (bool success, ) = logic.delegatecall(
                 abi.encodeWithSignature(
-                    "init(address,address,string,string,uint8,address)",
-                    _identityRegistry,
-                    _compliance,
+                    "init(string,string,uint8,uint256)",
                     _name,
                     _symbol,
                     _decimals,
-                    _onchainID
+                    _initialSupply
                 )
             );
         require(success, "Initialization failed.");

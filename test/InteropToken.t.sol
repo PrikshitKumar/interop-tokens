@@ -4,7 +4,10 @@ pragma solidity ^0.8.13;
 import {Test, console} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {InteropToken} from "../src/InteropToken.sol";
-import {OnchainCrossChainOrder, ResolvedCrossChainOrder, Output, FillInstruction, IOriginSettler} from "../src/ERC7683.sol";
+
+import {TokenStorage} from "../src/TokenStorage.sol";
+
+import {OnchainCrossChainOrder, ResolvedCrossChainOrder, Output, FillInstruction, IOriginSettler} from "../src/interface/IERC7683.sol";
 
 contract InteropTokenTest is Test {
     InteropToken public interopToken;
@@ -31,7 +34,9 @@ contract InteropTokenTest is Test {
         console.log("User2 Address: ", user2);
 
         // Deploy the contract
-        interopToken = new InteropToken(owner, "InteropToken", "IPT", 10000);
+        interopToken = new InteropToken();
+        interopToken.init("InteropToken", "IPT", 18, 10000);
+
     }
 
     // Test that owner can transfer tokens successfully
@@ -49,7 +54,7 @@ contract InteropTokenTest is Test {
             fillDeadline: 1769494252, // Example timestamp: 2026-01-27
             orderDataType: ORDER_DATA_TYPE_HASH,
             orderData: abi.encode(
-                InteropToken.OrderData({
+                TokenStorage.OrderData({
                     to: user2,
                     amount: 100,
                     destinationChainId: destinationChainId,
@@ -62,7 +67,7 @@ contract InteropTokenTest is Test {
         // Log each part of the order
         InteropToken.OrderData memory orderData = abi.decode(
             order.orderData,
-            (InteropToken.OrderData)
+            (TokenStorage.OrderData)
         );
         console.log("fillDeadline: ", order.fillDeadline);
         console.log("OrderType: ");
