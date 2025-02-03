@@ -15,7 +15,7 @@ contract DeployInteropToken is Script {
             msg.sender, // Initial owner
             "InteropToken", // Token Name
             "ITP", // Token Symbol
-            10000 // Initial supply (1 million tokens)
+            1000000 * 10 ** 18 // Initial supply (1 million tokens)
         );
 
         // Stop broadcasting
