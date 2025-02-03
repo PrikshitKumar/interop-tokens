@@ -21,30 +21,35 @@ const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 const RPC_URL = "http://127.0.0.1:8545/";
 const CHAIN_ID = 31337;
 
-// Custom hook for persistent state
+// Custom hook for persistent state with SSR safety
 const usePersistedState = (key: string, defaultValue: any) => {
-  const [state, setState] = useState(() => {
-    // Only attempt to read from localStorage when running on the client-side
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(key);
-      if (saved !== null) {
-        return JSON.parse(saved);
-      }
-    }
-    return defaultValue;
-  });
+  const [state, setState] = useState(defaultValue);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(key);
+      if (saved !== null) {
+        setState(JSON.parse(saved));
+      }
+      setIsInitialized(true);
+    }
+  }, [key]);
+
+  useEffect(() => {
+    if (isInitialized && typeof window !== "undefined") {
       localStorage.setItem(key, JSON.stringify(state));
     }
-  }, [key, state]);
+  }, [key, state, isInitialized]);
 
   return [state, setState];
 };
 
 const DashboardPage = () => {
-  // Persisted states
+  // Mounting state for hydration safety
+  const [mounted, setMounted] = useState(false);
+
+  // Persisted states with SSR safety
   const [isDarkMode, setIsDarkMode] = usePersistedState("darkMode", false);
   const [userAddress, setUserAddress] = usePersistedState("userAddress", "");
   const [transferForm, setTransferForm] = usePersistedState("transferForm", {
@@ -58,7 +63,7 @@ const DashboardPage = () => {
     feeToken: ethers.ZeroAddress,
     feeValue: "0",
   });
-  const [fillOrderId, setFillOrderId] = usePersistedState("userAddress", "");
+  const [fillOrderId, setFillOrderId] = usePersistedState("fillOrderId", "");
 
   // Blockchain states
   const [provider, setProvider] = useState<any>(null);
@@ -79,32 +84,38 @@ const DashboardPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Handle initial mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Initialize Web3 and check for existing connection
   useEffect(() => {
-    initializeWeb3();
-    checkExistingConnection();
+    if (mounted) {
+      initializeWeb3();
+      checkExistingConnection();
+    }
     return () => {
-      // Cleanup event listeners
       if (contract) {
         contract.removeAllListeners();
       }
     };
-  }, []);
+  }, [mounted]);
 
   // Auto-refresh data
   useEffect(() => {
-    if (contract) {
+    if (contract && mounted) {
       const refreshInterval = setInterval(() => {
         refreshData();
-      }, 30000); // Refresh every 30 seconds
+      }, 5000); // Refresh every 30 seconds
 
       return () => clearInterval(refreshInterval);
     }
-  }, [contract, account]);
+  }, [contract, account, mounted]);
 
   // Wallet event listeners
   useEffect(() => {
-    if (typeof window !== "undefined" && (window as any).ethereum) {
+    if (mounted && typeof window !== "undefined" && (window as any).ethereum) {
       const handleAccountsChanged = (accounts: string[]) => {
         if (accounts.length > 0) {
           handleWalletConnection(accounts[0]);
@@ -131,7 +142,7 @@ const DashboardPage = () => {
         );
       };
     }
-  }, []);
+  }, [mounted]);
 
   const initializeWeb3 = async () => {
     try {
@@ -145,7 +156,6 @@ const DashboardPage = () => {
         web3Provider
       );
       setContract(contractInstance);
-      // Set up event listeners
       setupEventListeners(contractInstance);
     } catch (error) {
       console.error("Failed to initialize Web3:", error);
@@ -282,10 +292,7 @@ const DashboardPage = () => {
     if (!contract) return;
 
     try {
-      // Fetch the 'Open' events that were emitted
       const events = await contract.queryFilter("Open");
-
-      // Use a Set to track unique orderIds and avoid duplicates
       const uniqueOrderIds = new Set();
 
       const orders = await Promise.all(
@@ -293,20 +300,16 @@ const DashboardPage = () => {
           async (event: { args: { resolvedOrder: { orderId: string } } }) => {
             const orderId = event.args.resolvedOrder.orderId;
 
-            // Skip the order if it has already been processed
             if (uniqueOrderIds.has(orderId)) return null;
-
             uniqueOrderIds.add(orderId);
 
             try {
-              // Fetch the order from the contract's state
               const order = await contract.pendingOrders(orderId);
-
               return {
                 id: orderId,
                 from: order.from,
                 amount: ethers.formatEther(order.orderData.amount),
-                status: "Pending", // You can change this if needed
+                status: "Pending",
               };
             } catch (error) {
               console.error(`Error fetching order with ID ${orderId}:`, error);
@@ -316,10 +319,7 @@ const DashboardPage = () => {
         )
       );
 
-      // Filter out any null orders that couldn't be fetched
       const validOrders = orders.filter((order) => order !== null);
-
-      console.log("orders: ", validOrders);
       setPendingOrders(validOrders);
     } catch (error) {
       console.error("Failed to fetch pending orders:", error);
@@ -361,15 +361,12 @@ const DashboardPage = () => {
       setIsLoading(true);
       setError(null);
 
-      const transfer = {
-        to: transferForm.recipient,
-        amount: ethers.parseEther(transferForm.amount),
-      };
-
-      const tx = await contract.transfer(transfer.to, transfer.amount);
+      const tx = await contract.transfer(
+        transferForm.recipient,
+        ethers.parseEther(transferForm.amount)
+      );
       await tx.wait();
 
-      // Reset form and refresh data
       setTransferForm({ recipient: "", amount: "" });
       await refreshData();
     } catch (error: any) {
@@ -418,7 +415,6 @@ const DashboardPage = () => {
       const tx = await contract.open(order);
       await tx.wait();
 
-      // Reset form and refresh data
       setOpenForm({
         toChain: 0,
         amount: "",
@@ -446,7 +442,6 @@ const DashboardPage = () => {
       setIsLoading(true);
       setError(null);
 
-      // Fetch the 'Open' events to extract order details
       const events = await contract.queryFilter("Open");
       let fillInstructions;
       let orderId;
@@ -464,14 +459,12 @@ const DashboardPage = () => {
         return;
       }
 
-      // Loop through the fillInstructions and execute fill
       for (const instruction of fillInstructions) {
         const tx = await contract.fill(orderId, instruction.originData, "0x");
         await tx.wait();
       }
 
-      // Reset form and refresh data
-      setFillOrderId(0);
+      setFillOrderId("");
       await refreshData();
     } catch (error: any) {
       console.error("Filling Order failed:", error);
@@ -480,6 +473,11 @@ const DashboardPage = () => {
       setIsLoading(false);
     }
   };
+
+  // Prevent hydration issues by not rendering until mounted
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div
