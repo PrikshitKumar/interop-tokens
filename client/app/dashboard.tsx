@@ -12,9 +12,12 @@ import {
   AlertCircle,
   LogOut,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import { abi } from "../artifacts/InteropToken.json";
 
 const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
@@ -84,6 +87,21 @@ const DashboardPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // New states for UI enhancements
+  const [processingAction, setProcessingAction] = useState(false);
+  const [progressValue, setProgressValue] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 5;
+
+  // Calculate pagination
+  const indexOfLastOrder = currentPage * ordersPerPage;
+  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
+  const currentOrders = pendingOrders.slice(
+    indexOfFirstOrder,
+    indexOfLastOrder
+  );
+  const totalPages = Math.ceil(pendingOrders.length / ordersPerPage);
+
   // Handle initial mounting
   useEffect(() => {
     setMounted(true);
@@ -107,7 +125,7 @@ const DashboardPage = () => {
     if (contract && mounted) {
       const refreshInterval = setInterval(() => {
         refreshData();
-      }, 5000); // Refresh every 30 seconds
+      }, 5000);
 
       return () => clearInterval(refreshInterval);
     }
@@ -143,6 +161,21 @@ const DashboardPage = () => {
       };
     }
   }, [mounted]);
+
+  // Enhanced processing simulation
+  const simulateProcessing = async (action: () => Promise<void>) => {
+    setProcessingAction(true);
+    setProgressValue(0);
+
+    for (let i = 0; i <= 100; i += 10) {
+      setProgressValue(i);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    await action();
+    setProcessingAction(false);
+    setProgressValue(0);
+  };
 
   const initializeWeb3 = async () => {
     try {
@@ -351,6 +384,7 @@ const DashboardPage = () => {
     }
   };
 
+  // Enhanced handlers with processing simulation
   const handleTransfer = async () => {
     if (!contract || !signer) {
       setError("Please connect your wallet first");
@@ -465,6 +499,10 @@ const DashboardPage = () => {
       }
 
       setFillOrderId("");
+      // Remove the filled order from pendingOrders
+      setPendingOrders((prev) =>
+        prev.filter((order) => order.id !== fillOrderId)
+      );
       await refreshData();
     } catch (error: any) {
       console.error("Filling Order failed:", error);
@@ -473,6 +511,10 @@ const DashboardPage = () => {
       setIsLoading(false);
     }
   };
+
+  const enhancedHandleTransfer = () => simulateProcessing(handleTransfer);
+  const enhancedHandleOpen = () => simulateProcessing(handleOpen);
+  const enhancedHandleFillOrder = () => simulateProcessing(handleFillOrder);
 
   // Prevent hydration issues by not rendering until mounted
   if (!mounted) {
@@ -534,17 +576,17 @@ const DashboardPage = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto p-4 space-y-8">
+      <main className="container mx-auto p-4 space-y-6 max-w-7xl">
         {/* Error Alert */}
         {error && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="transition-all duration-200 hover:shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
@@ -594,140 +636,77 @@ const DashboardPage = () => {
           </Card>
         </div>
 
-        {/* Fetch ERC-20 Balance */}
-        <Card className="transition-all duration-200">
-          <CardHeader>
-            <CardTitle>Check Token Balance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <label className="block">
-                  <span className="text-sm font-medium">User Address</span>
+        {/* Main Actions Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column - Token Operations */}
+          <div className="space-y-6">
+            {/* Check Balance Card */}
+            <Card className="transition-all duration-200">
+              <CardHeader>
+                <CardTitle className="text-xl">Check Token Balance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
                   <input
                     type="text"
-                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white transition-colors"
+                    className="w-full rounded-lg border p-3 dark:bg-gray-800 dark:border-gray-700"
                     placeholder="Enter user address"
                     value={userAddress}
                     onChange={(e) => setUserAddress(e.target.value)}
                   />
-                </label>
 
-                <button
-                  onClick={fetchBalance}
-                  disabled={isLoading}
-                  className="w-full py-2 px-4 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="animate-spin" size={16} />
-                      Checking Balance...
-                    </>
-                  ) : (
-                    "Check Balance"
+                  <button
+                    onClick={fetchBalance}
+                    disabled={processingAction}
+                    className="w-full py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {processingAction ? (
+                      <div className="flex flex-col items-center space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="animate-spin" size={16} />
+                          <span>Processing...</span>
+                        </div>
+                        <Progress
+                          value={progressValue}
+                          className="w-full h-2"
+                        />
+                      </div>
+                    ) : (
+                      "Check Balance"
+                    )}
+                  </button>
+
+                  {balance && (
+                    <div className="p-4 rounded-lg bg-gray-100 dark:bg-gray-800">
+                      <p className="text-lg font-semibold">
+                        Balance: {balance} TST
+                      </p>
+                    </div>
                   )}
-                </button>
+                </div>
+              </CardContent>
+            </Card>
 
-                {balance && (
-                  <div className="mt-4 p-4 rounded-lg bg-gray-100 dark:bg-gray-800 transition-colors">
-                    <p className="text-lg font-semibold">
-                      Balance: {balance} TST
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Transfer ERC-20 Section */}
-        <Card className="transition-all duration-200">
-          <CardHeader>
-            <CardTitle>Transfer Tokens</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <label className="block">
-                  <span className="text-sm font-medium">Amount</span>
+            {/* Cross-Chain Transfer Card */}
+            <Card className="transition-all duration-200">
+              <CardHeader>
+                <CardTitle className="text-xl">Cross-Chain Transfer</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
                   <input
                     type="text"
-                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white transition-colors"
-                    placeholder="Enter amount"
-                    value={transferForm.amount}
-                    onChange={(e) =>
-                      setTransferForm({
-                        ...transferForm,
-                        amount: e.target.value,
-                      })
-                    }
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">Recipient Address</span>
-                  <input
-                    type="text"
-                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white transition-colors"
-                    placeholder="Enter recipient address"
-                    value={transferForm.recipient}
-                    onChange={(e) =>
-                      setTransferForm({
-                        ...transferForm,
-                        recipient: e.target.value,
-                      })
-                    }
-                  />
-                </label>
-
-                <button
-                  onClick={handleTransfer}
-                  disabled={isLoading || !account}
-                  className="w-full py-2 px-4 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="animate-spin" size={16} />
-                      Processing Transfer...
-                    </>
-                  ) : (
-                    "Transfer Tokens"
-                  )}
-                </button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Cross-Chain Transfer Section */}
-        <Card className="transition-all duration-200">
-          <CardHeader>
-            <CardTitle>Cross-Chain Transfer</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <label className="block">
-                  <span className="text-sm font-medium">Amount</span>
-                  <input
-                    type="text"
-                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white transition-colors"
-                    placeholder="Enter amount"
+                    className="w-full rounded-lg border p-3 dark:bg-gray-800 dark:border-gray-700"
+                    placeholder="Amount"
                     value={openForm.amount}
                     onChange={(e) =>
-                      setOpenForm({
-                        ...openForm,
-                        amount: e.target.value,
-                      })
+                      setOpenForm({ ...openForm, amount: e.target.value })
                     }
                   />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-medium">To Chain ID</span>
                   <input
                     type="number"
-                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white transition-colors"
-                    placeholder="Enter destination chain ID"
+                    className="w-full rounded-lg border p-3 dark:bg-gray-800 dark:border-gray-700"
+                    placeholder="To Chain ID"
                     value={openForm.toChain}
                     onChange={(e) =>
                       setOpenForm({
@@ -736,126 +715,215 @@ const DashboardPage = () => {
                       })
                     }
                   />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-medium">Recipient Address</span>
                   <input
                     type="text"
-                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white transition-colors"
-                    placeholder="Enter recipient address"
+                    className="w-full rounded-lg border p-3 dark:bg-gray-800 dark:border-gray-700"
+                    placeholder="Recipient Address"
                     value={openForm.recipient}
                     onChange={(e) =>
-                      setOpenForm({
-                        ...openForm,
+                      setOpenForm({ ...openForm, recipient: e.target.value })
+                    }
+                  />
+
+                  <button
+                    onClick={enhancedHandleOpen}
+                    disabled={processingAction || !account}
+                    className="w-full py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {processingAction ? (
+                      <div className="flex flex-col items-center space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="animate-spin" size={16} />
+                          <span>Processing...</span>
+                        </div>
+                        <Progress
+                          value={progressValue}
+                          className="w-full h-2"
+                        />
+                      </div>
+                    ) : (
+                      "Submit Order"
+                    )}
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Column - Cross-Chain Operations */}
+          <div className="space-y-6">
+            {/* Transfer Card */}
+            <Card className="transition-all duration-200">
+              <CardHeader>
+                <CardTitle className="text-xl">Transfer Tokens</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    className="w-full rounded-lg border p-3 dark:bg-gray-800 dark:border-gray-700"
+                    placeholder="Amount"
+                    value={transferForm.amount}
+                    onChange={(e) =>
+                      setTransferForm({
+                        ...transferForm,
+                        amount: e.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    type="text"
+                    className="w-full rounded-lg border p-3 dark:bg-gray-800 dark:border-gray-700"
+                    placeholder="Recipient Address"
+                    value={transferForm.recipient}
+                    onChange={(e) =>
+                      setTransferForm({
+                        ...transferForm,
                         recipient: e.target.value,
                       })
                     }
                   />
-                </label>
-              </div>
-            </div>
 
-            <button
-              onClick={handleOpen}
-              disabled={isLoading || !account}
-              className="mt-6 w-full py-2 px-4 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="animate-spin" size={16} />
-                  Processing Order...
-                </>
-              ) : (
-                "Submit Order"
-              )}
-            </button>
-          </CardContent>
-        </Card>
+                  <button
+                    onClick={enhancedHandleTransfer}
+                    disabled={processingAction || !account}
+                    className="w-full py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {processingAction ? (
+                      <div className="flex flex-col items-center space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="animate-spin" size={16} />
+                          <span>Processing...</span>
+                        </div>
+                        <Progress
+                          value={progressValue}
+                          className="w-full h-2"
+                        />
+                      </div>
+                    ) : (
+                      "Transfer Tokens"
+                    )}
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Fill Order Section */}
-        <Card className="transition-all duration-200">
-          <CardHeader>
-            <CardTitle>Fill Order</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <label className="block">
-                  <span className="text-sm font-medium">OrderId</span>
+            {/* Fill Order Card */}
+            <Card className="transition-all duration-200">
+              <CardHeader>
+                <CardTitle className="text-xl">Fill Order</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
                   <input
                     type="text"
-                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white transition-colors"
-                    placeholder="Enter Order ID"
+                    className="w-full rounded-lg border p-3 dark:bg-gray-800 dark:border-gray-700"
+                    placeholder="Order ID"
                     value={fillOrderId}
                     onChange={(e) => setFillOrderId(e.target.value)}
                   />
-                </label>
-              </div>
-            </div>
 
-            <button
-              onClick={handleFillOrder}
-              disabled={isLoading || !account}
-              className="mt-6 w-full py-2 px-4 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="animate-spin" size={16} />
-                  Processing Order...
-                </>
-              ) : (
-                "Execute Order"
-              )}
-            </button>
-          </CardContent>
-        </Card>
+                  <button
+                    onClick={enhancedHandleFillOrder}
+                    disabled={processingAction || !account}
+                    className="w-full py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {processingAction ? (
+                      <div className="flex flex-col items-center space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="animate-spin" size={16} />
+                          <span>Processing...</span>
+                        </div>
+                        <Progress
+                          value={progressValue}
+                          className="w-full h-2"
+                        />
+                      </div>
+                    ) : (
+                      "Execute Order"
+                    )}
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-        {/* Pending Orders Section */}
+        {/* Pending Orders with Pagination */}
         <Card className="transition-all duration-200">
           <CardHeader>
-            <CardTitle>Pending Orders</CardTitle>
+            <CardTitle className="text-xl">Pending Orders</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              {pendingOrders.length > 0 ? (
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b dark:border-gray-700">
-                      <th className="text-left py-3 px-4">Order ID</th>
-                      <th className="text-left py-3 px-4">From</th>
-                      <th className="text-left py-3 px-4">Amount</th>
-                      <th className="text-left py-3 px-4">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pendingOrders.map((order: any) => (
-                      <tr
-                        key={order.id}
-                        className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <td className="py-3 px-4">{order.id}</td>
-                        <td className="py-3 px-4">
-                          {`${order.from.slice(0, 6)}...${order.from.slice(
-                            -4
-                          )}`}
-                        </td>
-                        <td className="py-3 px-4">{order.amount} TST</td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              order.status === "Pending"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                          >
-                            {order.status}
-                          </span>
-                        </td>
+              {currentOrders.length > 0 ? (
+                <>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b dark:border-gray-700">
+                        <th className="text-left py-3 px-4">Order ID</th>
+                        <th className="text-left py-3 px-4">From</th>
+                        <th className="text-left py-3 px-4">Amount</th>
+                        <th className="text-left py-3 px-4">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {currentOrders.map((order) => (
+                        <tr
+                          key={order.id}
+                          className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          <td className="py-3 px-4">{order.id}</td>
+                          <td className="py-3 px-4">
+                            {`${order.from.slice(0, 6)}...${order.from.slice(
+                              -4
+                            )}`}
+                          </td>
+                          <td className="py-3 px-4">{order.amount} TST</td>
+                          <td className="py-3 px-4">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              {order.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-between mt-4 px-4">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      Showing {indexOfFirstOrder + 1} to{" "}
+                      {Math.min(indexOfLastOrder, pendingOrders.length)} of{" "}
+                      {pendingOrders.length} orders
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() =>
+                          setCurrentPage((prev) => Math.max(prev - 1, 1))
+                        }
+                        disabled={currentPage === 1}
+                        className="p-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 dark:border-gray-700"
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+                      <span className="px-4 py-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setCurrentPage((prev) =>
+                            Math.min(prev + 1, totalPages)
+                          )
+                        }
+                        disabled={currentPage === totalPages}
+                        className="p-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 dark:border-gray-700"
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+                    </div>
+                  </div>
+                </>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                   No pending orders found
