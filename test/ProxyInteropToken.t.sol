@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {InteropToken} from "../src/InteropToken.sol";
 
@@ -34,25 +34,17 @@ contract ProxyInteropTokenTest is Test {
         user1 = vm.addr(1); // Fetch address 1 (used as a test account)
         user2 = vm.addr(2); // Fetch address 2 (another test account)
 
-        // Log the addresses to console
-        console.log("Owner Address: ", owner);
-        console.log("User1 Address: ", user1);
-        console.log("User2 Address: ", user2);
-
         // Deploy the contract
         interopToken = new InteropToken();
         implementationAuthority = new ImplementationAuthority(address(interopToken));
-        deployedProxy = new TokenProxy(address(implementationAuthority),"InteropToken", "IPT", 18);
-        console.log("setup complete\n token proxy at:", address(tokenProxy));
-        console.log("implementation at:", address(interopToken));
-        console.log("implementation authority at", address(implementationAuthority));
+        deployedProxy = new TokenProxy(address(implementationAuthority),address(owner),"InteropToken", "IPT", 18);
 
         // forcing the abi of interop token on the token proxy for proxy interactions
         tokenProxy = InteropToken(address(deployedProxy));
     }
 
     // Test: Ensure that the proxy delegates correctly to the logic contract
-    function testInitialDeployment() public {
+    function testInitialDeployment() public view {
         // Should use logic contract (interopToken) via proxy
         string memory tokenName = tokenProxy.name();
         assertEq(tokenName, "InteropToken");  
@@ -71,17 +63,11 @@ contract ProxyInteropTokenTest is Test {
         // Mint tokens by the owner
         vm.startPrank(owner);
 
-        // Record logs emitted during the execution
-        vm.recordLogs();
-
         // Call the function that emits the event
         tokenProxy.mint(address(owner), 10000);
 
-        // Stop recording logs
-        Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Assert that owner's balance increased by the minted amount
-        console.log("Owner Balance: ", tokenProxy.balanceOf(owner));
         assertEq(
             tokenProxy.balanceOf(owner),
             10000,

@@ -8,27 +8,29 @@ import {AbstractProxy} from "./AbstractProxy.sol";
 contract TokenProxy is AbstractProxy {
 
     constructor(
-        address implementationAuthority,
+        address _implementationAuthority,
+        address _initialOwner,
         string memory _name,
         string memory _symbol,
         uint8 _decimals
     ) {
         require(
-            implementationAuthority != address(0), "invalid argument - zero address");
+            _implementationAuthority != address(0), "invalid argument - zero address");
         require(
             keccak256(abi.encode(_name)) != keccak256(abi.encode(""))
             && keccak256(abi.encode(_symbol)) != keccak256(abi.encode(""))
         , "invalid argument - empty string");
         require(0 <= _decimals && _decimals <= 18, "decimals between 0 and 18");
-        _storeImplementationAuthority(implementationAuthority);
-        emit ImplementationAuthoritySet(implementationAuthority);
+        _storeImplementationAuthority(_implementationAuthority);
+        emit ImplementationAuthoritySet(_implementationAuthority);
 
         address logic = (IImplementationAuthority(getImplementationAuthority())).getImplementation();
 
         // solhint-disable-next-line avoid-low-level-calls
         (bool success, ) = logic.delegatecall(
                 abi.encodeWithSignature(
-                    "init(string,string,uint8)",
+                    "init(address,string,string,uint8)",
+                    _initialOwner,
                     _name,
                     _symbol,
                     _decimals

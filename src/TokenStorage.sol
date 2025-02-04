@@ -17,8 +17,12 @@ contract TokenStorage {
     /// @dev pause information
     bool internal _tokenPaused = false;
 
-    mapping(bytes32 => OrderData) public pendingOrders;
+    mapping(bytes32 => OpenOrder) public pendingOrders;
 
+    struct OpenOrder {
+        address from;
+        OrderData orderData;
+    }
     struct OrderData {
         address to;
         uint256 amount;
@@ -31,7 +35,13 @@ contract TokenStorage {
         keccak256(
             "Order(address,uint256,uint64,address,uint256)"
         );
-
+    
+    /**
+     * @notice The address of the Filler
+     * @dev Responsible to execute the orders
+     */
+    address internal FILLER =
+        address(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496);
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new

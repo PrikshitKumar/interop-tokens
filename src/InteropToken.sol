@@ -18,8 +18,13 @@ contract InteropToken is
     ReentrancyGuard
 {
     error WrongOrderType();
-    
+    error OrderNotPending(bytes32 orderId);
+    error UnauthorizedFiller(address sender, address filler);
+
     event Fill(bytes32 indexed orderId);
+    event Confirm(bytes32 indexed orderId);
+    event Cancel(bytes32 indexed orderId);
+
 
     /// modifiers
 
@@ -35,8 +40,21 @@ contract InteropToken is
         _;
     }
 
+
     /**
-     *  @dev the constructor initiates the token contract
+     * @notice Restricts access to only the authorized filler.
+     * @dev This modifier ensures that only the designated filler can execute the function it is applied to.
+     *
+     * Error:
+     * - `UnauthorizedFiller`: Reverted if the caller is not the authorized filler.
+     */
+    modifier onlyFiller() {
+        if (msg.sender != FILLER) revert UnauthorizedFiller(msg.sender, FILLER);
+        _;
+    }
+
+    /**
+     *  @dev this initiates the token contract
      *  msg.sender is set automatically as the owner of the smart contract
      *  @param _name the name of the token
      *  @param _symbol the symbol of the token
@@ -44,6 +62,7 @@ contract InteropToken is
      *  emits an `UpdatedTokenInformation` event
      */
     function init(
+        address _initialOwner,
         string memory _name,
         string memory _symbol,
         uint8 _decimals
@@ -58,7 +77,7 @@ contract InteropToken is
             && keccak256(abi.encode(_symbol)) != keccak256(abi.encode(""))
         , "invalid argument - empty string");
         require(0 <= _decimals && _decimals <= 18, "decimals between 0 and 18");
-        __Ownable_init(msg.sender);
+        __Ownable_init(_initialOwner);
         _tokenName = _name;
         _tokenSymbol = _symbol;
         _tokenDecimals = _decimals;
@@ -208,22 +227,23 @@ contract InteropToken is
     /// @dev This method must emit the Open event
     /// @param order The OnchainCrossChainOrder definition
     function open(OnchainCrossChainOrder calldata order) external nonReentrant {
-
         OrderData memory orderData = decode7683OrderData(order.orderData);
         ResolvedCrossChainOrder memory resolvedOrder = this.resolve(order);
 
-        require(orderData.amount != 0, "Invalid Order");
-
         require(
-            pendingOrders[resolvedOrder.orderId].amount == 0,
+            pendingOrders[resolvedOrder.orderId].from == address(0),
             "Order already pending"
         );
+        OpenOrder memory openOrder = OpenOrder({
+            from: msg.sender,
+            orderData: orderData
+        });
 
-        pendingOrders[resolvedOrder.orderId] = orderData;
+        pendingOrders[resolvedOrder.orderId] = openOrder;
 
         // order amount is taken in custody of the contract
         // to be released in the event of order cancellation due to filler failure
-        // to be burnt in the event of a successful cross-chain transfer 
+        // to be burnt in the event of a successful cross-chain transfer
         _transfer(msg.sender, address(this), orderData.amount);
         // TODO: Transfer the RelayFee (Native Tokens) to Filler
 
@@ -262,40 +282,59 @@ contract InteropToken is
 
         _fillInstructions[0] = FillInstruction({
             destinationChainId: orderData.destinationChainId,
-            destinationSettler: _toBytes32(address(this)), // Token address is assumed to be matching on the destination chain 
+            destinationSettler: _toBytes32(address(this)), // Token address is assumed to be matching on the destination chain
             originData: order.orderData
         });
 
-        return ResolvedCrossChainOrder({
-            user: msg.sender,
-            originChainId: block.chainid,
-            openDeadline: type(uint32).max, // No deadline for origin orders
-            fillDeadline: order.fillDeadline,
-            orderId: _generateOrderId(), // Generate order ID as hash of order data
-            maxSpent: _maxSpent,
-            minReceived: _minReceived,
-            fillInstructions: _fillInstructions
-        });
+        return
+            ResolvedCrossChainOrder({
+                user: msg.sender,
+                originChainId: block.chainid,
+                openDeadline: type(uint32).max, // No deadline for origin orders
+                fillDeadline: order.fillDeadline,
+                orderId: _generateOrderId(), // Generate order ID as hash of order data
+                maxSpent: _maxSpent,
+                minReceived: _minReceived,
+                fillInstructions: _fillInstructions
+            });
     }
 
     function fill(
         bytes32 orderId,
         bytes calldata originData,
         bytes calldata fillerData
-    ) external nonReentrant {
+    ) external nonReentrant onlyFiller {
+        if (pendingOrders[orderId].from == address(0)) {
+            revert OrderNotPending(orderId);
+        }
+
         // TODO: Validate the sender to be an authorized filler address on implementation authority
         OrderData memory orderData = decode7683OrderData(originData);
         _mint(orderData.to, orderData.amount);
 
         emit Fill(orderId);
+
         // TODO: To be Decided, what fillerData should contain
         // decode7683FillInstruction(fillerData);
         fillerData;
     }
 
-    // TODO: Add a confirmOrder function; called by the filler
+    function confirm(bytes32 orderId) external nonReentrant onlyFiller {
+        require(pendingOrders[orderId].from != address(0), "Order not found");
+        delete pendingOrders[orderId];
+        emit Confirm(orderId);
+    }
 
-    // TODO: Add a cancelOrder function; called by the filler 
+    function cancel(bytes32 orderId) external nonReentrant onlyFiller {
+        require(
+            pendingOrders[orderId].orderData.amount != 0,
+            "Order not found"
+        );
+        OpenOrder memory openOrder = pendingOrders[orderId];
+        _transfer(address(this), openOrder.from, openOrder.orderData.amount);
+        delete pendingOrders[orderId];
+        emit Cancel(orderId);
+    }
 
     function _generateOrderId() internal view returns (bytes32) {
         return
