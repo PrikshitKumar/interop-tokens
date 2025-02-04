@@ -23,6 +23,10 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Go to contracts directory
+        run: |
+          cd contracts
+
       - name: Show Forge version
         run: |
           forge --version
