@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import {
@@ -20,9 +19,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { abi } from "../artifacts/InteropToken.json";
 
-const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-const RPC_URL = "http://127.0.0.1:8545/";
-const CHAIN_ID = 31337;
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_INTEROP_TOKEN_CONTRACT_ADDRESS;
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
+const CHAIN_ID = process.env.NEXT_PUBLIC_CHAIN_ID;
 
 // Custom hook for persistent state with SSR safety
 const usePersistedState = (key: string, defaultValue: any) => {
