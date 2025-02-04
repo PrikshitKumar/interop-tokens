@@ -11,8 +11,7 @@ contract TokenProxy is AbstractProxy {
         address implementationAuthority,
         string memory _name,
         string memory _symbol,
-        uint8 _decimals,
-        uint256 _initialSupply
+        uint8 _decimals
     ) {
         require(
             implementationAuthority != address(0), "invalid argument - zero address");
@@ -29,11 +28,10 @@ contract TokenProxy is AbstractProxy {
         // solhint-disable-next-line avoid-low-level-calls
         (bool success, ) = logic.delegatecall(
                 abi.encodeWithSignature(
-                    "init(string,string,uint8,uint256)",
+                    "init(string,string,uint8)",
                     _name,
                     _symbol,
-                    _decimals,
-                    _initialSupply
+                    _decimals
                 )
             );
         require(success, "Initialization failed.");

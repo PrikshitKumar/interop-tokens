@@ -46,8 +46,7 @@ contract InteropToken is
     function init(
         string memory _name,
         string memory _symbol,
-        uint8 _decimals,
-        uint256 _initialSupply
+        uint8 _decimals
     ) external initializer {
         // that require is protecting legacy versions of   contracts
         // as there was a bug with the initializer modifier on these proxies
@@ -63,7 +62,6 @@ contract InteropToken is
         _tokenName = _name;
         _tokenSymbol = _symbol;
         _tokenDecimals = _decimals;
-        _mint(msg.sender, _initialSupply);
 
         emit UpdatedTokenInformation(_tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION);
     }

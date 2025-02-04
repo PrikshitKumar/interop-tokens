@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
@@ -35,13 +35,17 @@ contract InteropTokenTest is Test {
 
         // Deploy the contract
         interopToken = new InteropToken();
-        interopToken.init("InteropToken", "IPT", 18, 10000);
+        interopToken.init("InteropToken", "IPT", 18);
 
     }
 
     // Test that owner can transfer tokens successfully
     function testOpenOrder() public {
-        // Assert that user2's balance increased by the transfer amount
+        // mint 10000 tokens to the owner as an initial supply
+        interopToken.mint(address(owner), 10000);
+
+
+        // Assert that owner's balance increased by the transfer amount
         console.log("Owner Balance: ", interopToken.balanceOf(owner));
         assertEq(
             interopToken.balanceOf(owner),
