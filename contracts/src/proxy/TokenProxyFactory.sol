@@ -1,36 +1,34 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {InteropToken} from "./InteropToken.sol";
+import {TokenProxy} from "./TokenProxy.sol";
 
 /**
- * @dev Factory contract for deploying InteropToken contract using CREATE2.
+ * @dev Factory contract for deploying TokenProxy contract using CREATE2.
  *
- * This implementation provides a way to deterministically deploy InteropToken contract
+ * This implementation provides a way to deterministically deploy TokenProxy contract
  * using the CREATE2 opcode.
  *
- * The factory can deploy different types of InteropToken contract based on the
- * InteropTokenType enum defined in the InteropToken contract.
  */
-contract InteropTokenFactory {
+contract TokenProxyFactory {
     /**
-     * @notice Emitted when a new InteropToken contract is created.
-     * @dev This event is triggered upon the successful creation of a new `InteropToken` contract,
+     * @notice Emitted when a new TokenProxy contract is created.
+     * @dev This event is triggered upon the successful creation of a new `TokenProxy` contract,
      *      providing the address of the newly deployed contract and the salt used during its deployment.
      *
-     * @param deployedAddress The address of the newly deployed InteropToken contract
+     * @param deployedAddress The address of the newly deployed TokenProxy contract
      * @param salt The salt value used in CREATE2 deployment
      */
-    event InteropTokenCreated(address indexed deployedAddress, bytes32 salt);
+    event TokenProxyCreated(address indexed deployedAddress, bytes32 salt);
 
     /**
      * @dev Error thrown when the CREATE2 deployment fails
      */
-    error InteropTokenCreate2Failed();
+    error TokenProxyCreate2Failed();
 
     /**
-     * @notice Deploys a new InteropToken contract using CREATE2.
-     * @dev This function creates a new InteropToken contract with the specified parameters.
+     * @notice Deploys a new TokenProxy contract using CREATE2.
+     * @dev This function creates a new TokenProxy contract with the specified parameters.
      * The address of the deployed contract is deterministic and depends on the salt value.
      *
      * Requirements:
@@ -40,32 +38,33 @@ contract InteropTokenFactory {
      * @param _initialOwner The address of initial owner of tokens
      * @param _tokenName The name of the token
      * @param _tokenSymbol The symbol of the token
-     * @param _initialSupply The initial supply of tokens to mint
      * @param _salt A unique value used to determine the contract address
      * 
-     * @return deployedAddress The address of the newly deployed InteropToken contract
+     * @return deployedAddress The address of the newly deployed TokenProxy contract
      * 
      * Error:
-     * - `InteropTokenCreate2Failed`: Reverted if the deployment failed by verifying that the returned address is zero.
+     * - `TokenProxyCreate2Failed`: Reverted if the deployment failed by verifying that the returned address is zero.
      * 
      * Emits
-     * - `InteropTokenCreated`: Emitted when a new InteropToken contract is created.
+     * - `TokenProxyCreated`: Emitted when a new TokenProxy contract is created.
      */
-    function deployInteropTokenFromFactory(
+    function deployTokenProxyFromFactory(
+        address _implementationAuthority,
         address _initialOwner,
         string memory _tokenName,
         string memory _tokenSymbol,
-        uint256 _initialSupply,
+        uint8 _decimals,
         bytes32 _salt
     ) public returns (address) {
         address deployedAddress;
         bytes memory bytecode = abi.encodePacked(
-            type(InteropToken).creationCode,
+            type(TokenProxy).creationCode,
             abi.encode(
+                _implementationAuthority,
                 _initialOwner,
                 _tokenName,
                 _tokenSymbol,
-                _initialSupply
+                _decimals
             )
         );
 
@@ -86,10 +85,10 @@ contract InteropTokenFactory {
         }
 
         if (deployedAddress == address(0)) {
-            revert InteropTokenCreate2Failed();
+            revert TokenProxyCreate2Failed();
         }
 
-        emit InteropTokenCreated(deployedAddress, _salt);
+        emit TokenProxyCreated(deployedAddress, _salt);
 
         return deployedAddress;
     }

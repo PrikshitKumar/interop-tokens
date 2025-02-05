@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {InteropToken} from "../src/InteropToken.sol";
-import {OnchainCrossChainOrder, ResolvedCrossChainOrder, Output, FillInstruction, IOriginSettler} from "../src/ERC7683.sol";
+
+import {TokenStorage} from "../src/TokenStorage.sol";
+
+import {OnchainCrossChainOrder, ResolvedCrossChainOrder, Output, FillInstruction, IOriginSettler} from "../src/interface/IERC7683.sol";
 
 contract InteropTokenTest is Test {
     InteropToken public interopToken;
@@ -16,20 +19,31 @@ contract InteropTokenTest is Test {
     bytes32 constant ORDER_DATA_TYPE_HASH =
         keccak256("Order(address,uint256,uint64,address,uint256)");
 
+
     // Setup the Users
     function setUp() public {
+        console.log("hash is:");
+        console.logBytes32(keccak256("ERC-7683.interop-token"));        
+
+
         // Fetch default test accounts provided by Foundry
         owner = address(this); // The contract address is the owner by default
         user1 = vm.addr(1); // Fetch address 1 (used as a test account)
         user2 = vm.addr(2); // Fetch address 2 (another test account)
 
         // Deploy the contract
-        interopToken = new InteropToken(owner, "InteropToken", "IPT", 10000);
+        interopToken = new InteropToken();
+        interopToken.init(address(owner),"InteropToken", "IPT", 18);
+
     }
 
     // Test that owner can transfer tokens successfully
     function testOpenOrder() public {
-        // Assert that user2's balance increased by the transfer amount
+        // mint 10000 tokens to the owner as an initial supply
+        interopToken.mint(address(owner), 10000);
+
+
+        // Assert that owner's balance increased by the transfer amount
         assertEq(
             interopToken.balanceOf(owner),
             10000,
@@ -41,7 +55,7 @@ contract InteropTokenTest is Test {
             fillDeadline: 1769494252, // Example timestamp: 2026-01-27
             orderDataType: ORDER_DATA_TYPE_HASH,
             orderData: abi.encode(
-                InteropToken.OrderData({
+                TokenStorage.OrderData({
                     to: user2,
                     amount: 100,
                     destinationChainId: destinationChainId,

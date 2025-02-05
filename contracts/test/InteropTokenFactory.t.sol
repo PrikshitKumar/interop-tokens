@@ -2,31 +2,42 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {InteropTokenFactory} from "src/InteropTokenFactory.sol";
+import {TokenProxyFactory} from "src/proxy/TokenProxyFactory.sol";
+
+import {TokenProxy} from "src/proxy/TokenProxy.sol";
+
+import {ImplementationAuthority} from "src/proxy/ImplementationAuthority.sol";
+
 import {InteropToken} from "src/InteropToken.sol";
 
-contract InteropTokenFactoryTest is Test {
-    InteropTokenFactory factory;
+contract TokenProxyFactoryTest is Test {
+    TokenProxyFactory factory;
+    InteropToken interopToken;
+    ImplementationAuthority implementationAuthority;
+
     address deployer;
     address initialOwner;
     string tokenName = "Test Token";
     string tokenSymbol = "TST";
-    uint256 initialSupply = 10000;
+    uint8 decimals = 18;
     bytes32 salt = keccak256("unique-salt");
     // const SALT = ethers.randomBytes(32);
 
     function setUp() public {
-        factory = new InteropTokenFactory();
+        interopToken = new InteropToken();
+        implementationAuthority = new ImplementationAuthority(address(interopToken));
+        factory = new TokenProxyFactory();
         deployer = address(this);
         initialOwner = vm.addr(1);
     }
 
     function testDeployInteropTokenSuccess() public {
-        address deployedAddress = factory.deployInteropTokenFromFactory(
+        address deployedAddress = factory.deployTokenProxyFromFactory(
+            address(implementationAuthority),
             initialOwner,
             tokenName,
             tokenSymbol,
-            initialSupply,
+            decimals,
             salt
         );
 
@@ -37,29 +48,29 @@ contract InteropTokenFactoryTest is Test {
         InteropToken token = InteropToken(deployedAddress);
         assertEq(token.name(), tokenName);
         assertEq(token.symbol(), tokenSymbol);
-        assertEq(token.totalSupply(), initialSupply);
-        assertEq(token.balanceOf(initialOwner), initialSupply);
     }
 
     function testDeploymentWithSameSalt() public {
         // First deployment succeeds
-        factory.deployInteropTokenFromFactory(
+        factory.deployTokenProxyFromFactory(
+            address(implementationAuthority),
             initialOwner,
             tokenName,
             tokenSymbol,
-            initialSupply,
+            decimals,
             salt
         );
 
         // Expect the next deployment to fail before calling the function
-        vm.expectRevert(InteropTokenFactory.InteropTokenCreate2Failed.selector);
+        vm.expectRevert(TokenProxyFactory.TokenProxyCreate2Failed.selector);
 
         // This should revert and trigger `InteropTokenCreate2Failed`
-        factory.deployInteropTokenFromFactory(
+        factory.deployTokenProxyFromFactory(
+            address(implementationAuthority),
             initialOwner,
             tokenName,
             tokenSymbol,
-            initialSupply,
+            decimals,
             salt
         );
     }
@@ -67,8 +78,8 @@ contract InteropTokenFactoryTest is Test {
     function testCreate2AddressDeterministic() public {
         bytes32 initCodeHash = keccak256(
             abi.encodePacked(
-                type(InteropToken).creationCode,
-                abi.encode(initialOwner, tokenName, tokenSymbol, initialSupply)
+                type(TokenProxy).creationCode,
+                abi.encode(address(implementationAuthority),initialOwner, tokenName, tokenSymbol, decimals)
             )
         );
 
@@ -78,11 +89,12 @@ contract InteropTokenFactoryTest is Test {
             address(factory)
         );
 
-        address deployedAddress = factory.deployInteropTokenFromFactory(
+        address deployedAddress = factory.deployTokenProxyFromFactory(
+            address(implementationAuthority),
             initialOwner,
             tokenName,
             tokenSymbol,
-            initialSupply,
+            decimals,
             salt
         );
 
