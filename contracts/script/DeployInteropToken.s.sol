@@ -18,7 +18,7 @@ contract DeployInteropToken is Script {
         ImplementationAuthority implementationAuthority = new ImplementationAuthority(address(logic));
 
         InteropToken token = InteropToken(address(new TokenProxy(address(implementationAuthority),address(this),"InteropToken", "IPT", 18)));
-
+        
         // Stop broadcasting
         vm.stopBroadcast();
 

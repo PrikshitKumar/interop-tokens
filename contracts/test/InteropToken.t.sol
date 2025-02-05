@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {InteropToken} from "../src/InteropToken.sol";
 
@@ -19,8 +19,13 @@ contract InteropTokenTest is Test {
     bytes32 constant ORDER_DATA_TYPE_HASH =
         keccak256("Order(address,uint256,uint64,address,uint256)");
 
+
     // Setup the Users
     function setUp() public {
+        console.log("hash is:");
+        console.logBytes32(keccak256("ERC-7683.interop-token"));        
+
+
         // Fetch default test accounts provided by Foundry
         owner = address(this); // The contract address is the owner by default
         user1 = vm.addr(1); // Fetch address 1 (used as a test account)
