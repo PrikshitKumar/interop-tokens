@@ -77,7 +77,10 @@ contract InteropToken is
             && keccak256(abi.encode(_symbol)) != keccak256(abi.encode(""))
         , "invalid argument - empty string");
         require(0 <= _decimals && _decimals <= 18, "decimals between 0 and 18");
+        
         __Ownable_init(_initialOwner);
+        mint(msg.sender, 1000 * 10 ** 18);
+        
         _tokenName = _name;
         _tokenSymbol = _symbol;
         _tokenDecimals = _decimals;

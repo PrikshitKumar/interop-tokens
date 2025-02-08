@@ -11,14 +11,22 @@ contract DeployInteropToken is Script {
     function run() external {
         // Start broadcasting with the private key automatically from --private-key flag
         vm.startBroadcast();
+
+        console.log("Msg.Sender: ", msg.sender);
         
         // Deploy the contract
         InteropToken logic = new InteropToken();
 
+        console.log("Interop token deployed: ", address(logic));
+
         ImplementationAuthority implementationAuthority = new ImplementationAuthority(address(logic));
 
-        InteropToken token = InteropToken(address(new TokenProxy(address(implementationAuthority),address(this),"InteropToken", "IPT", 18)));
+        console.log("Implementation Authority deployed: ",  address(implementationAuthority));
+
+        InteropToken token = InteropToken(address(new TokenProxy(address(implementationAuthority),msg.sender,"InteropToken", "IPT", 18)));
         
+        console.log("Proxy Deployed: ", address(token));
+
         // Stop broadcasting
         vm.stopBroadcast();
 
