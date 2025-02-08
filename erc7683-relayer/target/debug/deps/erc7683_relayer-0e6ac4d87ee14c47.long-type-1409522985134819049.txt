@@ -1,0 +1,1 @@
+ContractInstance<Arc<SignerMiddleware<Arc<Provider<Http>>, Wallet<ecdsa::signing::SigningKey<Secp256k1>>>>, SignerMiddleware<Arc<Provider<Http>>, Wallet<ecdsa::signing::SigningKey<Secp256k1>>>>

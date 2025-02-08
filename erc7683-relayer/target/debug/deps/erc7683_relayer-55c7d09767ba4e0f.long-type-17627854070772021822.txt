@@ -1,0 +1,2 @@
+ethers_contract::event::Event<Arc<signer::SignerMiddleware<Arc<Provider<Ws>>, Wallet<ecdsa::signing::SigningKey<Secp256k1>>>>, signer::SignerMiddleware<Arc<Provider<Ws>>, Wallet<ecdsa::signing::SigningKey<Secp256k1>>>, FillEvent>
+ethers::ethers_contract::Event<Arc<ethers::ethers_middleware::SignerMiddleware<Arc<Provider<Ws>>, Wallet<ecdsa::signing::SigningKey<Secp256k1>>>>, ethers::ethers_middleware::SignerMiddleware<Arc<Provider<Ws>>, Wallet<ecdsa::signing::SigningKey<Secp256k1>>>, FillEvent>

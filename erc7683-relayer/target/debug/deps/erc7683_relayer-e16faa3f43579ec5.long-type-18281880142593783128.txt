@@ -1,0 +1,1 @@
+fn(_) -> Option<ethers::ethers_addressbook::Contract> {ethers::ethers_addressbook::contract::<_>}
