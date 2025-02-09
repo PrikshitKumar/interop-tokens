@@ -306,7 +306,7 @@ contract InteropToken is
         bytes32 orderId,
         bytes calldata originData,
         bytes calldata fillerData
-    ) external nonReentrant onlyFiller {
+    ) external nonReentrant {
         if (pendingOrders[orderId].from == address(0)) {
             revert OrderNotPending(orderId);
         }
@@ -322,7 +322,7 @@ contract InteropToken is
         fillerData;
     }
 
-    function confirm(bytes32 orderId) external nonReentrant onlyFiller {
+    function confirm(bytes32 orderId) external nonReentrant {
         require(pendingOrders[orderId].from != address(0), "Order not found");
         delete pendingOrders[orderId];
         emit Confirm(orderId);

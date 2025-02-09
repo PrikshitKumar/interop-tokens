@@ -41,7 +41,7 @@ contract TokenStorage {
      * @dev Responsible to execute the orders
      */
     address internal FILLER =
-        address(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496);
+        address(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC);
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
