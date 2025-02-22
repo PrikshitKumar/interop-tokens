@@ -68,9 +68,9 @@ const DashboardPage = () => {
   const [fillOrderId, setFillOrderId] = usePersistedState("fillOrderId", "");
 
   // Blockchain states
-  const [provider, setProvider] = useState<any>(null);
-  const [signer, setSigner] = useState<any>(null);
-  const [contract, setContract] = useState<any>(null);
+  const [provider, setProvider] = useState<ethers.Provider>();
+  const [signer, setSigner] = useState<ethers.Signer>();
+  const [contract, setContract] = useState<ethers.Contract>();
   const [account, setAccount] = useState<string>("");
   const [balance, setBalance] = useState<string>("");
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
@@ -133,7 +133,9 @@ const DashboardPage = () => {
   // Wallet event listeners
   useEffect(() => {
     if (mounted && typeof window !== "undefined" && (window as any).ethereum) {
+      console.log("line 136");
       const handleAccountsChanged = (accounts: string[]) => {
+        console.log("line 138");
         if (accounts.length > 0) {
           handleWalletConnection(accounts[0]);
         } else {
@@ -183,7 +185,7 @@ const DashboardPage = () => {
       setProvider(web3Provider);
 
       const contractInstance = new ethers.Contract(
-        CONTRACT_ADDRESS,
+        CONTRACT_ADDRESS as string,
         abi,
         web3Provider
       );
@@ -251,24 +253,65 @@ const DashboardPage = () => {
   };
 
   const handleWalletConnection = async (address: string) => {
+    console.log("line 256");
+
     try {
       const web3Provider = new ethers.BrowserProvider((window as any).ethereum);
       const web3Signer = await web3Provider.getSigner();
-
+      console.log("line 261");
       setSigner(web3Signer);
       setAccount(address);
 
       const contractWithSigner = new ethers.Contract(
-        CONTRACT_ADDRESS,
+        CONTRACT_ADDRESS as string,
         abi,
         web3Signer
       );
       setContract(contractWithSigner);
 
+      console.log("line 274");
+
+      console.log("line 292");
+
       await refreshData();
     } catch (error) {
       console.error("Failed to handle wallet connection:", error);
       setError("Failed to connect wallet");
+    }
+  };
+
+  const addTokenToMetaMask = async () => {
+    // Ensure window.ethereum is available
+    if (typeof (window as any).ethereum !== "undefined") {
+      try {
+        const tokenAddress = contract?.address; // Corrected address
+        const symbol = await contract?.symbol(); // Your token symbol
+        const decimals = await contract?.decimals(); // Your token decimals
+
+        // Request MetaMask to add the token
+        const wasAdded = await (window as any).ethereum.request({
+          method: "wallet_watchAsset",
+          params: {
+            type: "ERC20", // Token type
+            options: {
+              address: tokenAddress, // Correct token contract address
+              symbol: symbol, // Symbol (e.g., 'USDT')
+              decimals: decimals, // Decimals (e.g., 18)
+            },
+          },
+        });
+
+        // Success message
+        if (wasAdded) {
+          console.log("Token added to MetaMask");
+        } else {
+          console.log("Token not added to MetaMask");
+        }
+      } catch (error) {
+        console.error("Error adding token to MetaMask:", error);
+      }
+    } else {
+      console.error("MetaMask is not available");
     }
   };
 
@@ -311,7 +354,6 @@ const DashboardPage = () => {
       if (!ethers.isAddress(userAddress)) {
         throw new Error("Invalid address");
       }
-
       const balance = await contract.balanceOf(userAddress);
       setBalance(ethers.formatEther(balance));
     } catch (error) {

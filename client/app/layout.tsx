@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Introp Tokens",
-  description: "Interop Tokens are digital assets designed to facilitate secure, seamless cross-chain transactions and interoperability within decentralized ecosystems",
+  title: "Interop Tokens",
+  description:
+    "Interop Tokens are digital assets designed to facilitate secure, seamless cross-chain transactions and interoperability within decentralized ecosystems",
 };
 
 export default function RootLayout({
